@@ -1,0 +1,121 @@
+openapi: "3.0.0"
+info:
+  description: 'Presto object schemas'
+  title: 'Presto schemas'
+  version: "1"
+paths: {}
+# notes:
+  # enum types are not properly generated in HTML due to a bug fixed in a later version:
+  # https://github.com/OpenAPITools/openapi-generator/pull/16582#issuecomment-1719707219
+components:
+  schemas:
+    PlanValidateRequest:
+      type: object
+      required:
+        - session
+        - planNode
+      properties:
+        session:
+          $ref: '#/components/schemas/ConnectorSessionRepresentation'
+        extraCredentials:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map to store pre-fetched long-lived access token
+        planNode:
+          $ref: '#/components/schemas/PlanNode'
+    ConnectorSessionRepresentation:
+      type: object
+      required:
+        - queryId
+        - clientTransactionSupport
+        - user
+        - timeZoneKey
+        - locale
+        - clientTags
+        - resourceEstimates
+        - startTime
+        - systemProperties
+        - catalogProperties
+        - unprocessedCatalogProperties
+        - roles
+        - preparedStatements
+        - sessionFunctions
+      properties:
+        queryId:
+          type: string
+        transactionId:
+          $ref: '#/components/schemas/TransactionId'
+        clientTransactionSupport:
+          type: boolean
+        user:
+          type: string
+        principal:
+          type: string
+        source:
+          type: string
+        catalog:
+          type: string
+        schema:
+          type: string
+        traceToken:
+          type: string
+        timeZoneKey:
+          $ref: '#/components/schemas/TimeZoneKey'
+        locale:
+          $ref: '#/components/schemas/Locale'
+        remoteUserAddress:
+          type: string
+        userAgent:
+          type: string
+        clientInfo:
+          type: string
+        clientTags:
+          type: array
+          items:
+            type: string
+        resourceEstimates:
+          $ref: '#/components/schemas/ResourceEstimates'
+        startTime:
+          type: integer
+        systemProperties:
+          type: object
+          additionalProperties:
+            type: string
+        catalogProperties:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+        unprocessedCatalogProperties:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+        roles:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SelectedRole'
+        preparedStatements:
+          type: object
+          additionalProperties:
+            type: string
+        sessionFunctions:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SqlInvokedFunction'
+    PlanNode:
+      type: object
+      required:
+        - foo
+      properties:
+        foo:
+          type: string
+
+
+
+
+
+

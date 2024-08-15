@@ -1,0 +1,32 @@
+openapi: 3.0.0
+info:
+  title: Presto Native Plan Checker API
+  description: API for validating a Query Plan for a Native Worker.
+  version: "1"
+servers:
+  - url: http://localhost:8081
+    description: Presto native sidecar endpoint when running locally
+paths:
+  /v1/planValidate:
+    put:
+      summary: Send query plan for validation
+      description: Send a query plan to be validated as runnable by the native worker.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas_native_plan_checker.yaml/#/components/schemas/PlanValidateRequest'
+      responses:
+        '200':
+          description: Plan is compatible with native worker
+          content:
+            application/json:
+              example:
+                '{ "status": "ok" }'
+        '500':
+          description: Plan is invalid or is incompatible with the native worker
+          content:
+            application/json:
+              example:
+                '{ "status": "error", "message": **TODO** }'
