@@ -14,7 +14,6 @@
 package com.facebook.presto.governance;
 
 import com.facebook.presto.governance.security.testing.TestingGovernanceAccessControlFactory;
-import com.facebook.presto.governance.security.testing.TestingGovernanceSystemAccessControl;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.security.SystemAccessControlFactory;
 import com.google.common.collect.ImmutableList;
@@ -41,6 +40,6 @@ public class GovernancePlugin
     public Iterable<SystemAccessControlFactory> getSystemAccessControlFactories()
     {
         initializeAccessControlFactories();
-        return ImmutableList.of(new TestingGovernanceSystemAccessControl.Factory());
+        return Collections.emptyList();
     }
 }

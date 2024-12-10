@@ -14,22 +14,17 @@
 package com.facebook.presto.governance;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.governance.security.GovernanceConnectorAccessControl;
 import com.facebook.presto.governance.security.ViewExpression;
 import com.facebook.presto.plugin.base.security.AllowAllAccessControl;
-import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.google.common.base.Preconditions;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
+
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
@@ -85,94 +80,6 @@ public class GovernanceManager
     public GovernanceConnectorAccessControl getGovernanceConnectorAccessControl()
     {
         return accessControlWrapper;
-    }
-
-    private final Map<RowFilterKey, List<ViewExpression>> rowFilters = new HashMap<>();
-    private final Map<ColumnMaskKey, List<ViewExpression>> columnMasks = new HashMap<>();
-
-    public void rowFilter(QualifiedObjectName table, String identity, ViewExpression filter)
-    {
-        rowFilters.computeIfAbsent(new RowFilterKey(identity, table), key -> new ArrayList<>())
-                .add(filter);
-    }
-
-    public void columnMask(QualifiedObjectName table, String column, String identity, ViewExpression mask)
-    {
-        columnMasks.computeIfAbsent(new ColumnMaskKey(identity, table, column), key -> new ArrayList<>())
-                .add(mask);
-    }
-
-    public void reset()
-    {
-        rowFilters.clear();
-        columnMasks.clear();
-    }
-
-    private static class RowFilterKey
-    {
-        private final String identity;
-        private final QualifiedObjectName table;
-
-        public RowFilterKey(String identity, QualifiedObjectName table)
-        {
-            this.identity = requireNonNull(identity, "identity is null");
-            this.table = requireNonNull(table, "table is null");
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            RowFilterKey that = (RowFilterKey) o;
-            return identity.equals(that.identity) &&
-                    table.equals(that.table);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(identity, table);
-        }
-    }
-
-    private static class ColumnMaskKey
-    {
-        private final String identity;
-        private final QualifiedObjectName table;
-        private final String column;
-
-        public ColumnMaskKey(String identity, QualifiedObjectName table, String column)
-        {
-            this.identity = identity;
-            this.table = table;
-            this.column = column;
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            ColumnMaskKey that = (ColumnMaskKey) o;
-            return identity.equals(that.identity) &&
-                    table.equals(that.table) &&
-                    column.equals(that.column);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(identity, table, column);
-        }
     }
 
     private static class GovernanceConnectorAccessControlWrapper
