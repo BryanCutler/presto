@@ -187,7 +187,7 @@ public class IcebergFilterPushdown
         }
     }
 
-    private static ConnectorMetadata getConnectorMetadata(IcebergTransactionManager icebergTransactionManager, TableHandle tableHandle)
+    public static ConnectorMetadata getConnectorMetadata(IcebergTransactionManager icebergTransactionManager, TableHandle tableHandle)
     {
         requireNonNull(icebergTransactionManager, "icebergTransactionManager is null");
         ConnectorMetadata metadata = icebergTransactionManager.get(tableHandle.getTransaction());

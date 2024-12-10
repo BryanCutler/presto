@@ -18,6 +18,7 @@ import com.facebook.airlift.log.Logging;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.connector.jmx.JmxPlugin;
+import com.facebook.presto.governance.GovernancePlugin;
 import com.facebook.presto.hive.HdfsConfiguration;
 import com.facebook.presto.hive.HdfsConfigurationInitializer;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -214,6 +215,10 @@ public final class IcebergQueryRunner
             queryRunner.installPlugin(new JmxPlugin());
             queryRunner.createCatalog("jmx", "jmx");
         }
+
+        //////////////////////
+        queryRunner.installPlugin(new GovernancePlugin());
+        //////////////////////
 
         if (catalogType == HIVE.name()) {
             ExtendedHiveMetastore metastore = getFileHiveMetastore(icebergDataDirectory);

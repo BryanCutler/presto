@@ -14,6 +14,9 @@
 package com.facebook.presto.iceberg.optimizer;
 
 import com.facebook.presto.common.type.TypeManager;
+import com.facebook.presto.governance.security.GovernanceConnectorAccessControl;
+import com.facebook.presto.governance.security.GovernanceOptimizer;
+import com.facebook.presto.governance.security.RowFilterRewriter;
 import com.facebook.presto.iceberg.IcebergTransactionManager;
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
 import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
@@ -25,6 +28,7 @@ import com.google.inject.Inject;
 
 import java.util.Set;
 
+import static com.facebook.presto.iceberg.optimizer.IcebergFilterPushdown.getConnectorMetadata;
 import static java.util.Objects.requireNonNull;
 
 public class IcebergPlanOptimizerProvider
@@ -39,7 +43,8 @@ public class IcebergPlanOptimizerProvider
             RowExpressionService rowExpressionService,
             StandardFunctionResolution functionResolution,
             FunctionMetadataManager functionMetadataManager,
-            TypeManager typeManager)
+            TypeManager typeManager,
+            GovernanceConnectorAccessControl accessControl)
     {
         requireNonNull(transactionManager, "transactionManager is null");
         requireNonNull(rowExpressionService, "rowExpressionService is null");
@@ -55,7 +60,8 @@ public class IcebergPlanOptimizerProvider
                 new IcebergFilterPushdown(rowExpressionService, functionResolution, functionMetadataManager, transactionManager, typeManager),
                 new IcebergMetadataOptimizer(functionMetadataManager, typeManager, transactionManager, rowExpressionService, functionResolution),
                 new IcebergParquetDereferencePushDown(transactionManager, rowExpressionService, typeManager),
-                new IcebergEqualityDeleteAsJoin(functionResolution, transactionManager, typeManager));
+                new IcebergEqualityDeleteAsJoin(functionResolution, transactionManager, typeManager),
+                new GovernanceOptimizer(functionResolution, rowExpressionService, functionMetadataManager, tableHandle -> getConnectorMetadata(transactionManager, tableHandle), accessControl));
     }
 
     @Override

@@ -19,6 +19,9 @@ import com.facebook.airlift.event.client.EventModule;
 import com.facebook.airlift.json.JsonModule;
 import com.facebook.presto.cache.CachingModule;
 import com.facebook.presto.common.type.TypeManager;
+import com.facebook.presto.governance.GovernanceManager;
+import com.facebook.presto.governance.security.GovernanceConnectorAccessControl;
+import com.facebook.presto.governance.security.testing.TestingGovernanceConnectorAccessControl;
 import com.facebook.presto.hive.HiveCommonModule;
 import com.facebook.presto.hive.HiveCommonSessionProperties;
 import com.facebook.presto.hive.NodeVersion;
@@ -97,6 +100,7 @@ public final class InternalIcebergConnectorFactory
                         binder.bind(FunctionMetadataManager.class).toInstance(context.getFunctionMetadataManager());
                         binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
                         binder.bind(FilterStatsCalculatorService.class).toInstance(context.getFilterStatsCalculatorService());
+                        binder.bind(GovernanceConnectorAccessControl.class).toInstance(GovernanceManager.getInstance().getGovernanceConnectorAccessControl());
                     });
 
             Injector injector = app
@@ -116,6 +120,7 @@ public final class InternalIcebergConnectorFactory
             IcebergTableProperties icebergTableProperties = injector.getInstance(IcebergTableProperties.class);
             Set<Procedure> procedures = injector.getInstance((Key<Set<Procedure>>) Key.get(Types.setOf(Procedure.class)));
             ConnectorPlanOptimizerProvider planOptimizerProvider = injector.getInstance(ConnectorPlanOptimizerProvider.class);
+            GovernanceConnectorAccessControl accessControl = injector.getInstance(GovernanceConnectorAccessControl.class);
 
             List<PropertyMetadata<?>> allSessionProperties = new ArrayList<>(icebergSessionProperties.getSessionProperties());
             allSessionProperties.addAll(hiveCommonSessionProperties.getSessionProperties());
@@ -133,7 +138,7 @@ public final class InternalIcebergConnectorFactory
                     IcebergSchemaProperties.SCHEMA_PROPERTIES,
                     icebergTableProperties.getTableProperties(),
                     icebergTableProperties.getColumnProperties(),
-                    new AllowAllAccessControl(),
+                    accessControl,
                     procedures,
                     planOptimizerProvider);
         }
