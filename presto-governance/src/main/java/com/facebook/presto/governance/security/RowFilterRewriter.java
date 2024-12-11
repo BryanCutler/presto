@@ -131,7 +131,7 @@ public class RowFilterRewriter
     public PlanNode visitTableScan(TableScanNode tableScan, RewriteContext<GovernanceConnectorAccessControl.RowFilterData> context)
     {
         GovernanceConnectorAccessControl.RowFilterData rowFilterData = context.get();
-        List<ViewExpression> filterExpressions = rowFilterData.getRowFilterExpressions();
+        List<ViewExpression> filterExpressions = rowFilterData.getRowFilterExpressions(tableScan);
 
         Map<VariableReferenceExpression, RowExpression> maskingExpressions = Collections.emptyMap();// = getColumnMaskExpressions(session, tableScan);
 
@@ -193,21 +193,6 @@ public class RowFilterRewriter
         return node;
 
          */
-    }
-
-    public static class Context<D>
-    {
-        private final D rowFilterData;
-
-        public Context(D rowFilterData)
-        {
-            this.rowFilterData = requireNonNull(rowFilterData, "rowFilterData is null");
-        }
-
-        public D getRowFilterData()
-        {
-            return rowFilterData;
-        }
     }
 }
 

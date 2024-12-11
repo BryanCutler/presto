@@ -129,6 +129,9 @@ public class ColumnMaskingRewriter
     @Override
     public PlanNode visitTableScan(TableScanNode tableScan, RewriteContext<GovernanceConnectorAccessControl.ColumnMaskingData> context)
     {
+        GovernanceConnectorAccessControl.ColumnMaskingData columnMaskingData = context.get();
+        Map<String, ViewExpression> columnMaskingExpressions = columnMaskingData.getColumnMaskingExpressions(tableScan);
+
         Map<VariableReferenceExpression, RowExpression> maskingExpressions = Collections.emptyMap();// = getRowFilterExpressions(session, tableScan);
 
         if (maskingExpressions.isEmpty()) {

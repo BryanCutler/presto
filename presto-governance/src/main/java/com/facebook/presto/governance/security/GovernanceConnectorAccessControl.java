@@ -15,30 +15,15 @@ package com.facebook.presto.governance.security;
 
 import com.facebook.presto.plugin.base.security.ForwardingConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
+import com.facebook.presto.spi.plan.PlanNode;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
-
-import static java.util.Objects.requireNonNull;
 
 public abstract class GovernanceConnectorAccessControl
         extends ForwardingConnectorAccessControl
 {
     protected ConnectorAccessControl delegate;
-
-    /*public static ConnectorAccessControl of(Supplier<ConnectorAccessControl> connectorAccessControlSupplier)
-    {
-        requireNonNull(connectorAccessControlSupplier, "connectorAccessControlSupplier is null");
-        return new GovernanceConnectorAccessControl()
-        {
-            @Override
-            protected ConnectorAccessControl delegate()
-            {
-                return connectorAccessControlSupplier.get();
-            }
-        };
-    }*/
 
     public GovernanceConnectorAccessControl(ConnectorAccessControl delegate)
     {
@@ -62,7 +47,7 @@ public abstract class GovernanceConnectorAccessControl
             return true;
         }
 
-        protected abstract List<ViewExpression> getRowFilterExpressions();
+        protected abstract List<ViewExpression> getRowFilterExpressions(PlanNode planNode);
     }
 
     public static abstract class ColumnMaskingData
@@ -71,6 +56,6 @@ public abstract class GovernanceConnectorAccessControl
         {
             return true;
         }
-        protected abstract Map<String, ViewExpression> getColumnMaskingExpressions();
+        protected abstract Map<String, ViewExpression> getColumnMaskingExpressions(PlanNode planNode);
     }
 }

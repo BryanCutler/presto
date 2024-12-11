@@ -17,6 +17,7 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.presto.governance.security.GovernanceConnectorAccessControl;
 import com.facebook.presto.governance.security.ViewExpression;
 import com.facebook.presto.plugin.base.security.AllowAllAccessControl;
+import com.facebook.presto.spi.plan.PlanNode;
 import com.google.common.base.Preconditions;
 
 import java.util.Collections;
@@ -134,7 +135,7 @@ public class GovernanceManager
                 }
 
                 @Override
-                protected List<ViewExpression> getRowFilterExpressions()
+                protected List<ViewExpression> getRowFilterExpressions(PlanNode planNode)
                 {
                     return Collections.emptyList();
                 }
@@ -153,7 +154,7 @@ public class GovernanceManager
                 }
 
                 @Override
-                protected Map<String, ViewExpression> getColumnMaskingExpressions()
+                protected Map<String, ViewExpression> getColumnMaskingExpressions(PlanNode planNode)
                 {
                     return Collections.emptyMap();
                 }

@@ -19,6 +19,7 @@ import com.facebook.presto.governance.security.ViewExpression;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.security.AccessControlContext;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
@@ -55,7 +56,7 @@ public class TestingGovernanceConnectorAccessControl
             extends RowFilterData
     {
         @Override
-        protected List<ViewExpression> getRowFilterExpressions()
+        protected List<ViewExpression> getRowFilterExpressions(PlanNode planNode)
         {
             return Collections.emptyList();
         }
@@ -65,7 +66,7 @@ public class TestingGovernanceConnectorAccessControl
             extends ColumnMaskingData
     {
         @Override
-        protected  Map<String, ViewExpression> getColumnMaskingExpressions()
+        protected  Map<String, ViewExpression> getColumnMaskingExpressions(PlanNode planNode)
         {
             return Collections.emptyMap();
         }
