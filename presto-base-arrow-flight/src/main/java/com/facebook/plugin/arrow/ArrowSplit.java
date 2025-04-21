@@ -19,11 +19,15 @@ import com.facebook.presto.spi.NodeProvider;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableMap;
 
 import javax.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+
+import static com.google.common.base.MoreObjects.toStringHelper;
 
 public class ArrowSplit
         implements ConnectorSplit
@@ -58,7 +62,16 @@ public class ArrowSplit
     @Override
     public Object getInfo()
     {
-        return this.getInfoMap();
+        return this;
+    }
+
+    @Override
+    public Map<String, String> getInfoMap()
+    {
+        return ImmutableMap.<String, String>builder()
+                .put("schemaName", schemaName != null ? schemaName : "null")
+                .put("tableName", tableName)
+                .build();
     }
 
     @JsonProperty
@@ -77,5 +90,14 @@ public class ArrowSplit
     public byte[] getFlightEndpointBytes()
     {
         return flightEndpointBytes;
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("schemaName", schemaName)
+                .add("tableName", tableName)
+                .toString();
     }
 }
