@@ -27,6 +27,7 @@ import org.apache.arrow.flight.grpc.ContextPropagatingExecutorService;
 import org.apache.arrow.memory.BufferAllocator;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -45,6 +46,11 @@ public class FlightShimServer
                 .add(new JsonModule())
                 .add(extraModules)
                 .build());
+
+        // Required for ConnectorManager - add as optional property because required will prevent loading config from file
+        Map<String, String> optionalConfigProperties = new HashMap<>();
+        optionalConfigProperties.put("node.environment", "flightshim");
+        app.setOptionalConfigurationProperties(optionalConfigProperties);
 
         if (config != null && !config.isEmpty()) {
             // Required config was provided instead of vm option -Dconfig=<path-to-config>
