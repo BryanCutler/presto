@@ -19,17 +19,22 @@ import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.GroupByHashPageIndexerFactory;
 import com.facebook.presto.PagesIndexPageSorter;
+import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
+import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.block.BlockEncodingManager;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.connector.ConnectorContextInstance;
+import com.facebook.presto.connector.ConnectorManager;
 import com.facebook.presto.cost.ConnectorFilterStatsCalculatorService;
 import com.facebook.presto.cost.FilterStatsCalculator;
 import com.facebook.presto.cost.ScalarStatsCalculator;
 import com.facebook.presto.cost.StatsNormalizer;
 import com.facebook.presto.metadata.InMemoryNodeManager;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.metadata.Split;
+import com.facebook.presto.metadata.StaticCatalogStore;
 import com.facebook.presto.metadata.StaticCatalogStoreConfig;
 import com.facebook.presto.nodeManager.PluginNodeManager;
 import com.facebook.presto.operator.PagesIndex;
@@ -39,6 +44,7 @@ import com.facebook.presto.server.PluginManagerUtil;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorHandleResolver;
+import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorTableHandle;
@@ -46,6 +52,7 @@ import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.CoordinatorPlugin;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.classloader.ThreadContextClassLoader;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorContext;
@@ -59,6 +66,7 @@ import com.facebook.presto.spi.relation.ExpressionOptimizerProvider;
 import com.facebook.presto.spi.relation.PredicateCompiler;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.RowExpressionService;
+import com.facebook.presto.split.PageSourceManager;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.RowExpressionPredicateCompiler;
 import com.facebook.presto.sql.planner.planPrinter.RowExpressionFormatter;
@@ -101,6 +109,7 @@ public class FlightShimPluginManager
 {
     private static final Logger log = Logger.get(FlightShimPluginManager.class);
     private static final String SERVICES_FILE = "META-INF/services/" + Plugin.class.getName();
+    private final ConnectorManager connectorManager;
     private final Map<String, ConnectorFactory> connectorFactories = new ConcurrentHashMap<>();
     private final Map<String, ConnectorHolder> connectors = new ConcurrentHashMap<>();
     private final File installedPluginsDir;
@@ -108,6 +117,7 @@ public class FlightShimPluginManager
     private final ArtifactResolver resolver;
     private final AtomicBoolean pluginsLoading = new AtomicBoolean();
     private final AtomicBoolean pluginsLoaded = new AtomicBoolean();
+    private final StaticCatalogStore staticCatalogStore;
     private final PluginInstaller pluginInstaller;
     private final File catalogConfigurationDir;
     private final Set<String> disabledCatalogs;
@@ -119,9 +129,13 @@ public class FlightShimPluginManager
     private final TypeDeserializer typeDeserializer;
     private final BlockEncodingManager blockEncodingManager;
     private final ProcedureRegistry procedureRegistry;
+    private final PageSourceManager pageSourceManager;
 
     @Inject
     public FlightShimPluginManager(
+            ConnectorManager connectorManager,
+            StaticCatalogStore staticCatalogStore,
+            PageSourceManager pageSourceManager,
             PluginManagerConfig pluginManagerConfig,
             StaticCatalogStoreConfig catalogStoreConfig,
             Metadata metadata,
@@ -129,6 +143,9 @@ public class FlightShimPluginManager
             BlockEncodingManager blockEncodingManager,
             ProcedureRegistry procedureRegistry)
     {
+        this.connectorManager = requireNonNull(connectorManager, "connectorManager is null");
+        this.staticCatalogStore = requireNonNull(staticCatalogStore, "staticCatalogStore is null");
+        this.pageSourceManager = requireNonNull(pageSourceManager, "pageSourceManager is null");
         requireNonNull(pluginManagerConfig, "pluginManagerConfig is null");
         requireNonNull(catalogStoreConfig, "catalogStoreConfig is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -186,7 +203,7 @@ public class FlightShimPluginManager
     public void loadCatalogs()
             throws Exception
     {
-        if (!catalogsLoading.compareAndSet(false, true)) {
+        /*if (!catalogsLoading.compareAndSet(false, true)) {
             return;
         }
 
@@ -196,7 +213,8 @@ public class FlightShimPluginManager
             }
         }
 
-        catalogsLoaded.set(true);
+        catalogsLoaded.set(true);*/
+        staticCatalogStore.loadCatalogs();
     }
 
     private void loadCatalog(File file)
@@ -259,8 +277,26 @@ public class FlightShimPluginManager
     {
         for (ConnectorFactory factory : plugin.getConnectorFactories()) {
             log.info("Registering connector %s", factory.getName());
-            connectorFactories.put(factory.getName(), factory);
+            //connectorFactories.put(factory.getName(), factory);
+            connectorManager.addConnectorFactory(factory);
+            connectors.computeIfAbsent(factory.getName(), name -> {
+                try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
+                    ConnectorHolder holder = new ConnectorHolder(null, factory.getHandleResolver(), typeDeserializer, blockEncodingManager);
+                    log.debug("Finished loading connector: %s", name);
+                    return holder;
+                }
+            });
         }
+    }
+
+    private ConnectorHolder getConnectorHolder(String connectorId)
+    {
+        return connectors.get(connectorId);
+    }
+
+    public ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats)
+    {
+        return pageSourceManager.createPageSource(session, split, table, columns, runtimeStats);
     }
 
     public ConnectorHolder getConnector(String connectorId)

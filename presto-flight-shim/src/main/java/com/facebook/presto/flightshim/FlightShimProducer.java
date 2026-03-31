@@ -19,6 +19,7 @@ import com.facebook.plugin.arrow.ArrowBatchSource;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.execution.QueryIdGenerator;
+import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
@@ -102,8 +103,8 @@ public class FlightShimProducer
             FlightShimPluginManager.ConnectorHolder connectorHolder = pluginManager.getConnector(request.getConnectorId());
             requireNonNull(connectorHolder, format("Requested connector not loaded: %s", request.getConnectorId()));
 
-            Connector connector = connectorHolder.getConnector();
-            ConnectorSplit split = connectorHolder.getCodecSplit().fromJson(request.getSplitBytes());
+            //Connector connector = connectorHolder.getConnector();
+            ConnectorSplit connectorSplit = connectorHolder.getCodecSplit().fromJson(request.getSplitBytes());
 
             List<? extends ColumnHandle> columnHandles = request.getColumnHandlesBytes().stream().map(
                     columnHandleBytes -> connectorHolder.getCodecColumnHandle().fromJson(columnHandleBytes)
@@ -126,9 +127,17 @@ public class FlightShimProducer
                     .setTimeZoneKey(DEFAULT_TIME_ZONE_KEY)
                     .setLocale(ENGLISH).build();
             ConnectorId connectorId = new ConnectorId(request.getConnectorId());
+            Split split = new Split(connectorId, transactionHandle, connectorSplit);
+
+            List<ColumnHandle> columnHandles2 = request.getColumnHandlesBytes().stream().map(
+                    columnHandleBytes -> connectorHolder.getCodecColumnHandle().fromJson(columnHandleBytes)
+            ).collect(toImmutableList());
+
+            ConnectorPageSource connectorPageSource = pluginManager.createPageSource(session, split, tableHandle, columnHandles2, new RuntimeStats());
+
             ConnectorSession connectorSession = session.toConnectorSession(connectorId);
 
-            ConnectorPageSourceProvider connectorPageSourceProvider = getConnectorPageSourceProvider(connector, connectorId);
+            /*ConnectorPageSourceProvider connectorPageSourceProvider = getConnectorPageSourceProvider(connector, connectorId);
             ConnectorPageSource connectorPageSource = connectorPageSourceProvider.createPageSource(
                     transactionHandle,
                     connectorSession,
@@ -136,7 +145,7 @@ public class FlightShimProducer
                     null,
                     unmodifiableList(columnHandles),
                     new SplitContext(false),
-                    new RuntimeStats());
+                    new RuntimeStats());*/
 
             try (ArrowBatchSource batchSource = new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
                 listener.setUseZeroCopy(true);

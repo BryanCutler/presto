@@ -54,6 +54,7 @@ import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.metadata.SchemaPropertyManager;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.metadata.SessionPropertyProviderConfig;
+import com.facebook.presto.metadata.StaticCatalogStore;
 import com.facebook.presto.metadata.StaticCatalogStoreConfig;
 import com.facebook.presto.metadata.StaticFunctionNamespaceStore;
 import com.facebook.presto.metadata.StaticFunctionNamespaceStoreConfig;
@@ -134,7 +135,7 @@ public class FlightShimModule
         // FlightShim configs
         configBinder(binder).bindConfig(FlightShimConfig.class, FlightShimConfig.CONFIG_PREFIX);
         configBinder(binder).bindConfig(PluginManagerConfig.class);
-        configBinder(binder).bindConfig(StaticCatalogStoreConfig.class);
+        //configBinder(binder).bindConfig(StaticCatalogStoreConfig.class);
 
         // Presto configs
         configBinder(binder).bindConfig(QueryManagerConfig.class);
@@ -181,7 +182,9 @@ public class FlightShimModule
         // history statistics
         configBinder(binder).bindConfig(HistoryBasedOptimizationConfig.class);
 
-        // catalog
+        // catalog manager
+        binder.bind(StaticCatalogStore.class).in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(StaticCatalogStoreConfig.class);
         binder.bind(ConnectorManager.class).in(Scopes.SINGLETON);
         binder.bind(CatalogManager.class).in(Scopes.SINGLETON);
 
