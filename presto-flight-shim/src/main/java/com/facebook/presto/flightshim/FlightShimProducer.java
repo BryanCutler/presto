@@ -117,7 +117,7 @@ public class FlightShimProducer
         int rowCount = 0;
         int batchCount = 0;
         try {
-            final BackpressureStrategy backpressureStrategy = new BackpressureStrategy.CallbackBackpressureStrategy();
+            final BackpressureStrategy backpressureStrategy = new MyBackpressureStrategy();
             backpressureStrategy.register(listener);
 
             FlightShimRequest request = requestCodec.fromJson(ticket.getBytes());
@@ -159,14 +159,25 @@ public class FlightShimProducer
 
             ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
 
+            int backpressureTimeoutCount = 0;
             try (ArrowBatchSource batchSource = new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
                 listener.setUseZeroCopy(true);
                 listener.start(batchSource.getVectorSchemaRoot());
                 columnCount = batchSource.getVectorSchemaRoot().getFieldVectors().size();
                 while (batchSource.nextBatch()) {
+                    if (context.isCancelled()) {
+                        log.info(format("Client cancelled read from connector %s", request.getConnectorId()));
+                        break;
+                    }
                     BackpressureStrategy.WaitResult waitResult;
                     while ((waitResult = backpressureStrategy.waitForListener(CLIENT_POLL_TIME)) == BackpressureStrategy.WaitResult.TIMEOUT) {
-                        log.debug(format("Waiting for client to read from connector %s", request.getConnectorId()));
+                        backpressureTimeoutCount += 1;
+                        if (backpressureTimeoutCount >= 6) {
+                            log.debug(format("Client not responding as ready from connector %s [wr=%s] [%s]", request.getConnectorId(), waitResult, rowCount));
+                            break;
+                        } else {
+                            log.debug(format("Waiting for client to read from connector %s [wr=%s] [%s]", request.getConnectorId(), waitResult, rowCount));
+                        }
                     }
                     if (waitResult != BackpressureStrategy.WaitResult.READY) {
                         log.info(format("Read stopped from connector %s due to client wait result: %s", request.getConnectorId(), waitResult));
@@ -211,5 +222,18 @@ public class FlightShimProducer
         }
         pluginManager.stop();
         allocator.close();
+    }
+
+    static class MyBackpressureStrategy extends BackpressureStrategy.CallbackBackpressureStrategy
+    {
+        protected void readyCallback()
+        {
+            log.debug("readyCallback");
+        }
+
+        protected void cancelCallback()
+        {
+            log.debug("cancelCallback");
+        }
     }
 }
