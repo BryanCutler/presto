@@ -93,9 +93,6 @@ public class FlightShimServer
             builder.location(Location.forGrpcInsecure(config.getServerName(), config.getServerPort()));
         }
 
-        ExecutorService executor = injector.getInstance(Key.get(ExecutorService.class, ForFlightShimServer.class));
-        builder.executor(new ContextPropagatingExecutorService(executor));
-
         FlightShimProducer producer = injector.getInstance(FlightShimProducer.class);
         builder.producer(producer);
 
