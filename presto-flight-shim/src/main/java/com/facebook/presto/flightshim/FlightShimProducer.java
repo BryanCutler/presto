@@ -48,6 +48,7 @@ import org.apache.arrow.memory.BufferAllocator;
 
 import javax.inject.Inject;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -164,11 +165,12 @@ public class FlightShimProducer
                 listener.start(batchSource.getVectorSchemaRoot());
                 columnCount = batchSource.getVectorSchemaRoot().getFieldVectors().size();
                 while (batchSource.nextBatch()) {
-                    BackpressureStrategy.WaitResult waitResult;
-                    while ((waitResult = backpressureStrategy.waitForListener(CLIENT_POLL_TIME)) == BackpressureStrategy.WaitResult.TIMEOUT) {
-                        log.debug(format("Waiting for client to read from connector %s [wr=%s] [rows=%s] [ready=%s]", request.getConnectorId(), waitResult, rowCount, listener.isReady()));
+                    BackpressureStrategy.WaitResult waitResult = backpressureStrategy.waitForListener(CLIENT_POLL_TIME);
+                    if (waitResult == BackpressureStrategy.WaitResult.TIMEOUT) {
+                        log.debug(format("Waiting for client to read from connector %s [rows=%s] [r=%s,c=%s,%s] [%s]",
+                                request.getConnectorId(), rowCount, listener.isReady(), listener.isCancelled(), context.isCancelled(), new String(request.getSplitBytes(), StandardCharsets.UTF_8)));
                     }
-                    if (waitResult != BackpressureStrategy.WaitResult.READY) {
+                    else if (waitResult != BackpressureStrategy.WaitResult.READY) {
                         log.info(format("Read stopped from connector %s due to client wait result: %s", request.getConnectorId(), waitResult));
                         break;
                     }
@@ -213,7 +215,8 @@ public class FlightShimProducer
         allocator.close();
     }
 
-    static class MyBackpressureStrategy extends BackpressureStrategy.CallbackBackpressureStrategy
+    static class MyBackpressureStrategy
+            extends BackpressureStrategy.CallbackBackpressureStrategy
     {
         protected void readyCallback()
         {
