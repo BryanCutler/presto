@@ -159,25 +159,14 @@ public class FlightShimProducer
 
             ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
 
-            int backpressureTimeoutCount = 0;
             try (ArrowBatchSource batchSource = new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
                 listener.setUseZeroCopy(true);
                 listener.start(batchSource.getVectorSchemaRoot());
                 columnCount = batchSource.getVectorSchemaRoot().getFieldVectors().size();
                 while (batchSource.nextBatch()) {
-                    if (context.isCancelled()) {
-                        log.info(format("Client cancelled read from connector %s", request.getConnectorId()));
-                        break;
-                    }
                     BackpressureStrategy.WaitResult waitResult;
                     while ((waitResult = backpressureStrategy.waitForListener(CLIENT_POLL_TIME)) == BackpressureStrategy.WaitResult.TIMEOUT) {
-                        backpressureTimeoutCount += 1;
-                        if (backpressureTimeoutCount >= 6) {
-                            log.debug(format("Client not responding as ready from connector %s [wr=%s] [%s]", request.getConnectorId(), waitResult, rowCount));
-                            break;
-                        } else {
-                            log.debug(format("Waiting for client to read from connector %s [wr=%s] [%s] %s", request.getConnectorId(), waitResult, rowCount, listener.isReady()));
-                        }
+                        log.debug(format("Waiting for client to read from connector %s [wr=%s] [rows=%s] [ready=%s]", request.getConnectorId(), waitResult, rowCount, listener.isReady()));
                     }
                     if (waitResult != BackpressureStrategy.WaitResult.READY) {
                         log.info(format("Read stopped from connector %s due to client wait result: %s", request.getConnectorId(), waitResult));
