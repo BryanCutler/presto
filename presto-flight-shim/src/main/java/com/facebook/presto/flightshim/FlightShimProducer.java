@@ -176,7 +176,7 @@ public class FlightShimProducer
                             log.debug(format("Client not responding as ready from connector %s [wr=%s] [%s]", request.getConnectorId(), waitResult, rowCount));
                             break;
                         } else {
-                            log.debug(format("Waiting for client to read from connector %s [wr=%s] [%s]", request.getConnectorId(), waitResult, rowCount));
+                            log.debug(format("Waiting for client to read from connector %s [wr=%s] [%s] %s", request.getConnectorId(), waitResult, rowCount, listener.isReady()));
                         }
                     }
                     if (waitResult != BackpressureStrategy.WaitResult.READY) {
