@@ -101,6 +101,7 @@ public class ArrowPageBuilder
                 blockBuilders[i] = types.get(i).createBlockBuilder(pageBuilderStatus.createBlockBuilderStatus(), initialExpectedEntries);
             }
         }*/
+        this.blockBuilders = null;
     }
 
     public void reset()

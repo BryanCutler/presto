@@ -17,7 +17,9 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
+import com.facebook.plugin.arrow.ArrowBatchIterator;
 import com.facebook.plugin.arrow.ArrowBatchSource;
+import com.facebook.plugin.arrow.ConnectorArrowSource;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.RuntimeStats;
@@ -54,6 +56,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.facebook.plugin.arrow.ConnectorArrowSource.CONNECTOR_ARROW_SOURCE_ENABLED;
 import static com.facebook.presto.metadata.SessionPropertyManager.createTestingSessionPropertyManager;
 import static com.facebook.presto.testing.TestingSession.DEFAULT_TIME_ZONE_KEY;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -139,7 +142,9 @@ public class FlightShimProducer
                     .setQueryId(queryIdGenerator.createNextQueryId())
                     .setIdentity(new Identity("user", Optional.empty()))
                     .setTimeZoneKey(DEFAULT_TIME_ZONE_KEY)
-                    .setLocale(ENGLISH).build();
+                    .setLocale(ENGLISH)
+                    .setSystemProperty(CONNECTOR_ARROW_SOURCE_ENABLED, "true")
+                    .build();
             ConnectorId connectorId = new ConnectorId(request.getConnectorId());
             Split split = new Split(connectorId, transactionHandle, connectorSplit);
 
@@ -160,8 +165,11 @@ public class FlightShimProducer
             }
 
             ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
+            if (connectorPageSource instanceof ConnectorArrowSource) {
+                log.debug("Using ArrowBatchSource");
+            }
 
-            try (ArrowBatchSource batchSource = new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
+            try (ArrowBatchSource batchSource = ArrowBatchSource.create(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
                 listener.setUseZeroCopy(true);
                 listener.start(batchSource.getVectorSchemaRoot());
                 columnCount = batchSource.getVectorSchemaRoot().getFieldVectors().size();
