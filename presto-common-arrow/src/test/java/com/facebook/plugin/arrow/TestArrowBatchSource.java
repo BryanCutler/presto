@@ -90,7 +90,7 @@ public class TestArrowBatchSource
 
     @Test
     public void testPrimitiveTypes()
-            throws IOException
+            throws Exception
     {
         try (BitVector bitVector = new BitVector("bitVector", allocator);
                 TinyIntVector tinyIntVector = new TinyIntVector("tinyIntVector", allocator);
@@ -129,7 +129,7 @@ public class TestArrowBatchSource
 
             // Set for 1 batch per page
             int batchCount = 0;
-            try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, numValues)) {
+            try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, numValues)) {
                 while (arrowBatchSource.nextBatch()) {
                     assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                     ++batchCount;
@@ -141,7 +141,7 @@ public class TestArrowBatchSource
 
     @Test
     public void testDateTimeTypes()
-            throws IOException
+            throws Exception
     {
         try (IntVector intVector = new IntVector("id", allocator);
                 DateDayVector dateVector = new DateDayVector("date", allocator);
@@ -173,7 +173,7 @@ public class TestArrowBatchSource
 
             TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
-            try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+            try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
                 assertTrue(arrowBatchSource.nextBatch());
                 assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                 assertFalse(arrowBatchSource.nextBatch());
@@ -183,7 +183,7 @@ public class TestArrowBatchSource
 
     @Test
     public void testTimestampWithTimeZoneType()
-            throws IOException
+            throws Exception
     {
         final int numValues = 10;
         BlockBuilder timeBuilder = TIME_WITH_TIME_ZONE.createBlockBuilder(null, numValues);
@@ -211,7 +211,7 @@ public class TestArrowBatchSource
 
             TestArrowPageSource pageSource = new TestArrowPageSource(numValues, blocks, columns, 1); //TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
-            try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+            try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
                 assertTrue(arrowBatchSource.nextBatch());
                 assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                 assertFalse(arrowBatchSource.nextBatch());
@@ -221,7 +221,7 @@ public class TestArrowBatchSource
 
     @Test
     public void testVarCharType()
-            throws IOException
+            throws Exception
     {
         final int numValues = 100;
         final int maxRowsPerBatch = 33;
@@ -244,7 +244,7 @@ public class TestArrowBatchSource
             TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
             int actualRowCount = 0;
-            try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, maxRowsPerBatch)) {
+            try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, maxRowsPerBatch)) {
                 while (arrowBatchSource.nextBatch()) {
                     try (VectorSchemaRoot expectedSlice = expectedRoot.slice(actualRowCount, Math.min(numValues - actualRowCount, maxRowsPerBatch))) {
                         assertTrue(expectedSlice.equals(arrowBatchSource.getVectorSchemaRoot()));
@@ -258,7 +258,7 @@ public class TestArrowBatchSource
 
     @Test
     public void testArrayType()
-            throws IOException
+            throws Exception
     {
         try (IntVector intVector = new IntVector("id", allocator);
                 ListVector listVectorInt = ListVector.empty("array-int", allocator);
@@ -299,7 +299,7 @@ public class TestArrowBatchSource
 
                 TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
-                try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+                try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
                     assertTrue(arrowBatchSource.nextBatch());
                     assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                     assertFalse(arrowBatchSource.nextBatch());
@@ -310,7 +310,7 @@ public class TestArrowBatchSource
 
     @Test
     void testMapType()
-            throws IOException
+            throws Exception
     {
         try (IntVector intVector = new IntVector("id", allocator);
                 MapVector mapLongVector = MapVector.empty("map-long-long", allocator, false);
@@ -350,7 +350,7 @@ public class TestArrowBatchSource
 
                 TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
-                try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+                try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
                     assertTrue(arrowBatchSource.nextBatch());
                     assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                     assertFalse(arrowBatchSource.nextBatch());
@@ -361,7 +361,7 @@ public class TestArrowBatchSource
 
     @Test
     void testRowType()
-            throws IOException
+            throws Exception
     {
         try (IntVector intVector = new IntVector("id", allocator);
                 StructVector structVector = StructVector.empty("struct", allocator)) {
@@ -387,7 +387,7 @@ public class TestArrowBatchSource
 
                 TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 
-                try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+                try (ArrowBatchSource arrowBatchSource = ArrowBatchSource.create(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
                     assertTrue(arrowBatchSource.nextBatch());
                     assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
                     assertFalse(arrowBatchSource.nextBatch());
