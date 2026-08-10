@@ -21,9 +21,11 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.FixedPageSource;
 import com.facebook.presto.spi.SplitContext;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.google.common.collect.ImmutableList;
 
@@ -97,5 +99,13 @@ public class PageSourceManager
         checkArgument(provider != null, "No page stream provider for '%s", split.getConnectorId());
 
         return provider;
+    }
+
+    @Override
+    public ConnectorArrowSourceBase createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, Object holder)
+    {
+        ConnectorSession connectorSession = session.toConnectorSession(split.getConnectorId());
+        ConnectorTableLayoutHandle layoutHandle = table.getLayout().orElse(null);
+        return getPageSourceProvider(split).createArrowSource(split.getTransactionHandle(), connectorSession, split.getConnectorSplit(), layoutHandle, columns, split.getSplitContext(), runtimeStats, recordBatchSize, holder);
     }
 }

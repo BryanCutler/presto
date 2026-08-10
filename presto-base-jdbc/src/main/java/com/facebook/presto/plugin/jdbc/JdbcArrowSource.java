@@ -14,16 +14,9 @@
 package com.facebook.presto.plugin.jdbc;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.plugin.arrow.BlockArrowWriter;
 import com.facebook.plugin.arrow.ConnectorArrowSource;
-import com.facebook.presto.common.type.Type;
-import com.facebook.presto.plugin.jdbc.mapping.ReadFunction;
-import com.facebook.presto.plugin.jdbc.mapping.ReadMapping;
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
-import com.google.common.base.VerifyException;
-import io.airlift.slice.Slice;
 import org.apache.arrow.adapter.jdbc.ArrowVectorIterator;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
@@ -67,10 +60,9 @@ public class JdbcArrowSource extends ConnectorArrowSource
     private final ResultSet resultSet;
     private boolean closed;
 
-    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList)
+    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, Object holder)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
-
         this.columnHandles = columnHandleList.toArray(new JdbcColumnHandle[0]);
 
         List<Field> fields = columnHandleList.stream().map(columnHandle -> prestoToArrowField(columnHandle.getColumnMetadata())).collect(Collectors.toList());
@@ -85,18 +77,20 @@ public class JdbcArrowSource extends ConnectorArrowSource
         catch (SQLException | RuntimeException e) {
             throw handleSqlException(e);
         }
-    }
 
-    @Override
-    public void init(BufferAllocator allocator, int batchSize)
-    {
+        if (!(holder instanceof BufferAllocator)) {
+            throw new IllegalArgumentException("Expected ConnectorArrowSourceImpl.BufferAllocatorHolder");
+        }
+
+        BufferAllocator allocator = ((BufferAllocator) holder);
+
         this.root = VectorSchemaRoot.create(schema, allocator);
         // TODO need to make sure schemas equal
         this.loader = new VectorLoader(root);
 
         try {
             JdbcToArrowConfig config =
-                    new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(batchSize).setReuseVectorSchemaRoot(true)
+                    new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
                             //.setArraySubTypeByColumnNameMap(ARRAY_SUB_TYPE_BY_COLUMN_NAME_MAP)
                             .build();
 
@@ -114,7 +108,7 @@ public class JdbcArrowSource extends ConnectorArrowSource
     }
 
     @Override
-    public boolean nextBatch()
+    public boolean nextArrowBatch()
     {
         if (vectorIterator.hasNext()) {
             final VectorUnloader unloader = new VectorUnloader(vectorIterator.next());
@@ -247,6 +241,10 @@ public class JdbcArrowSource extends ConnectorArrowSource
             return;
         }
         closed = true;
+
+        if (vectorIterator != null) {
+            vectorIterator.close();
+        }
 
         // use try with resources to close everything properly
         try (Connection connection = this.connection;

@@ -14,17 +14,18 @@
 package com.facebook.plugin.arrow;
 
 import com.facebook.presto.common.Page;
-import com.facebook.presto.spi.ConnectorPageSource;
+import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
 
 import java.io.IOException;
 
 public abstract class ConnectorArrowSource
-    extends ArrowBatchSource implements ConnectorPageSource
+        extends ConnectorArrowSourceBase
 {
     public static final String CONNECTOR_ARROW_SOURCE_ENABLED = "connector-arrow-source-enabled";
 
-    public abstract void init(BufferAllocator allocator, int batchSize);
+    public abstract VectorSchemaRoot getVectorSchemaRoot();
 
     @Override
     public long getCompletedBytes()
@@ -68,4 +69,28 @@ public abstract class ConnectorArrowSource
     {
 
     }
+
+    public static class BufferAllocatorHolder extends ConnectorArrowSourceBase.BufferAllocatorHolder
+    {
+        private final BufferAllocator allocator;
+
+        public BufferAllocatorHolder(BufferAllocator allocator)
+        {
+            this.allocator = allocator;
+        }
+
+        public BufferAllocator getBufferAllocator()
+        {
+            return allocator;
+        }
+    }
+
+    /*public static class VectorSchemaRootHolder extends ConnectorArrowSource.VectorSchemaRootHolder
+    {
+
+        public VectorSchemaRoot getVectorSchemaRoot()
+        {
+
+        }
+    }*/
 }
