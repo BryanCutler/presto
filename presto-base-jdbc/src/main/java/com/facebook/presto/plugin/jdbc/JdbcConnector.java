@@ -22,7 +22,6 @@ import com.facebook.presto.spi.connector.ConnectorCapabilities;
 import com.facebook.presto.spi.connector.ConnectorCommitHandle;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
-import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
@@ -60,7 +59,6 @@ public class JdbcConnector
     private final LifeCycleManager lifeCycleManager;
     private final JdbcMetadataFactory jdbcMetadataFactory;
     private final JdbcSplitManager jdbcSplitManager;
-    private final JdbcPageSourceProvider jdbcPageSourceProvider;
     private final JdbcRecordSetProvider jdbcRecordSetProvider;
     private final JdbcPageSinkProvider jdbcPageSinkProvider;
     private final Optional<ConnectorAccessControl> accessControl;
@@ -78,7 +76,6 @@ public class JdbcConnector
             LifeCycleManager lifeCycleManager,
             JdbcMetadataFactory jdbcMetadataFactory,
             JdbcSplitManager jdbcSplitManager,
-            JdbcPageSourceProvider jdbcPageSourceProvider,
             JdbcRecordSetProvider jdbcRecordSetProvider,
             JdbcPageSinkProvider jdbcPageSinkProvider,
             Optional<ConnectorAccessControl> accessControl,
@@ -92,7 +89,6 @@ public class JdbcConnector
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataFactory = requireNonNull(jdbcMetadataFactory, "jdbcMetadataFactory is null");
         this.jdbcSplitManager = requireNonNull(jdbcSplitManager, "jdbcSplitManager is null");
-        this.jdbcPageSourceProvider = requireNonNull(jdbcPageSourceProvider, "jdbcPageSourceProvider is null");
         this.jdbcRecordSetProvider = requireNonNull(jdbcRecordSetProvider, "jdbcRecordSetProvider is null");
         this.jdbcPageSinkProvider = requireNonNull(jdbcPageSinkProvider, "jdbcPageSinkProvider is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
@@ -157,12 +153,6 @@ public class JdbcConnector
     public ConnectorSplitManager getSplitManager()
     {
         return jdbcSplitManager;
-    }
-
-    @Override
-    public ConnectorPageSourceProvider getPageSourceProvider()
-    {
-        return jdbcPageSourceProvider;
     }
 
     @Override

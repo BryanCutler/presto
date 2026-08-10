@@ -54,4 +54,18 @@ public interface ConnectorPageSourceProvider
     {
         return createPageSource(transactionHandle, session, split, columns, splitContext);
     }
+
+    default ConnectorArrowSourceBase createArrowSource(
+            ConnectorTransactionHandle transactionHandle,
+            ConnectorSession session,
+            ConnectorSplit split,
+            ConnectorTableLayoutHandle layout,
+            List<ColumnHandle> columns,
+            SplitContext splitContext,
+            RuntimeStats runtimeStats,
+            int recordBatchSize,
+            Object holder)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

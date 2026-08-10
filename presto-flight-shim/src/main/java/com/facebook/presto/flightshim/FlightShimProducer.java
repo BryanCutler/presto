@@ -17,9 +17,8 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
-import com.facebook.plugin.arrow.ArrowBatchIterator;
-import com.facebook.plugin.arrow.ArrowBatchSource;
 import com.facebook.plugin.arrow.ConnectorArrowSource;
+import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.RuntimeStats;
@@ -32,7 +31,6 @@ import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
@@ -56,7 +54,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.facebook.plugin.arrow.ConnectorArrowSource.CONNECTOR_ARROW_SOURCE_ENABLED;
+import static com.facebook.presto.spi.connector.ConnectorArrowSourceBase.CONNECTOR_ARROW_SOURCE_ENABLED;
 import static com.facebook.presto.metadata.SessionPropertyManager.createTestingSessionPropertyManager;
 import static com.facebook.presto.testing.TestingSession.DEFAULT_TIME_ZONE_KEY;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -164,16 +162,11 @@ public class FlightShimProducer
                 throw new IllegalArgumentException(format("Request has different number of fields than column handles: %d != %d", columnsMetadata.size(), columnHandles.size()));
             }
 
-            ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
-            if (connectorPageSource instanceof ConnectorArrowSource) {
-                log.debug("Using ArrowBatchSource");
-            }
-
-            try (ArrowBatchSource batchSource = ArrowBatchSource.create(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())) {
+            try (ConnectorArrowSource arrowSource = createConnectorArrowSource(session, split, tableHandle, columnHandles)) {
                 listener.setUseZeroCopy(true);
-                listener.start(batchSource.getVectorSchemaRoot());
-                columnCount = batchSource.getVectorSchemaRoot().getFieldVectors().size();
-                while (batchSource.nextBatch()) {
+                listener.start(arrowSource.getVectorSchemaRoot());
+                columnCount = arrowSource.getVectorSchemaRoot().getFieldVectors().size();
+                while (arrowSource.nextArrowBatch()) {
                     BackpressureStrategy.WaitResult waitResult;
                     while ((waitResult = backpressureStrategy.waitForListener(CLIENT_POLL_TIME)) == BackpressureStrategy.WaitResult.TIMEOUT) {
                         log.debug(format("Waiting for client to read from connector %s", request.getConnectorId()));
@@ -182,7 +175,7 @@ public class FlightShimProducer
                         log.info(format("Read stopped from connector %s due to client wait result: %s", request.getConnectorId(), waitResult));
                         break;
                     }
-                    rowCount += batchSource.getVectorSchemaRoot().getRowCount();
+                    rowCount += arrowSource.getVectorSchemaRoot().getRowCount();
                     batchCount++;
                     listener.putNext();
                 }
@@ -197,6 +190,24 @@ public class FlightShimProducer
         finally {
             log.debug(format("Processing GetStream completed [columns=%d, rows=%d, batches=%d]", columnCount, rowCount, batchCount));
         }
+    }
+
+    protected ConnectorArrowSource createConnectorArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles)
+    {
+        try {
+            ConnectorArrowSourceBase connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
+            if (connectorArrowSource instanceof ConnectorArrowSource) {
+                log.debug("Using ConnectorArrowSource");
+                return (ConnectorArrowSource) connectorArrowSource;
+            }
+        }
+        catch (UnsupportedOperationException e)
+        {
+            //ArrowBatchSource batchSource = ArrowBatchSource.create(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())
+            throw e;
+        }
+
+        throw new IllegalArgumentException("Must use ConnectorArrowSourceImpl");
     }
 
     public void shutdown()
