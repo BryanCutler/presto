@@ -17,6 +17,7 @@ import com.facebook.presto.common.Page;
 import com.facebook.presto.common.block.Block;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorPageSource;
+import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import com.google.common.collect.ImmutableList;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.AllocationHelper;
@@ -34,14 +35,12 @@ public abstract class ArrowBatchSource
 {
     public static ArrowBatchSource create(BufferAllocator allocator, List<ColumnMetadata> columns, ConnectorPageSource pageSource, int maxRowsPerBatch)
     {
-        if (pageSource instanceof ConnectorArrowSource) {
-            ConnectorArrowSource arrowSource = (ConnectorArrowSource) pageSource;
-            arrowSource.init(allocator, maxRowsPerBatch);
-            return arrowSource;
-        }
-        else {
-            return new ArrowBatchFromBlock(allocator, columns, pageSource, maxRowsPerBatch);
-        }
+        return new ArrowBatchFromBlock(allocator, columns, pageSource, maxRowsPerBatch);
+    }
+
+    public static ArrowBatchSource create(BufferAllocator allocator, List<ColumnMetadata> columns, ConnectorArrowSourceBase pageSource, int maxRowsPerBatch)
+    {
+        return null;
     }
 
     private static void allocateVectorCapacity(VectorSchemaRoot root, int capacity)
