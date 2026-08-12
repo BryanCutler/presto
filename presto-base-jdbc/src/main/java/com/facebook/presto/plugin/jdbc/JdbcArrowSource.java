@@ -14,9 +14,9 @@
 package com.facebook.presto.plugin.jdbc;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.plugin.arrow.ConnectorArrowSource;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import org.apache.arrow.adapter.jdbc.ArrowVectorIterator;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
@@ -39,11 +39,9 @@ import java.util.stream.Collectors;
 
 import static com.facebook.plugin.arrow.BlockArrowWriter.prestoToArrowField;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-public class JdbcArrowSource extends ConnectorArrowSource
+public class JdbcArrowSource extends ConnectorArrowSourceBase
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
@@ -52,6 +50,7 @@ public class JdbcArrowSource extends ConnectorArrowSource
     ArrowVectorIterator vectorIterator;
     VectorSchemaRoot root;
     VectorLoader loader;
+    BufferAllocator allocator;
     boolean hasNext;
 
     private final JdbcClient jdbcClient;
@@ -82,7 +81,7 @@ public class JdbcArrowSource extends ConnectorArrowSource
             throw new IllegalArgumentException("Expected ConnectorArrowSourceImpl.BufferAllocatorHolder");
         }
 
-        BufferAllocator allocator = ((BufferAllocator) holder);
+        this.allocator = ((BufferAllocator) holder).newChildAllocator("jdbc-arrow-source", 0, Long.MAX_VALUE);
 
         this.root = VectorSchemaRoot.create(schema, allocator);
         // TODO need to make sure schemas equal
@@ -102,7 +101,7 @@ public class JdbcArrowSource extends ConnectorArrowSource
     }
 
     @Override
-    public VectorSchemaRoot getVectorSchemaRoot()
+    public Object getVectorSchemaRoot()
     {
         return root;
     }
@@ -110,11 +109,19 @@ public class JdbcArrowSource extends ConnectorArrowSource
     @Override
     public boolean nextArrowBatch()
     {
+        root.clear();
+
         if (vectorIterator.hasNext()) {
-            final VectorUnloader unloader = new VectorUnloader(vectorIterator.next());
-            try (ArrowRecordBatch batch = unloader.getRecordBatch()) {
-                loader.load(batch);
-            }
+            //try (VectorSchemaRoot newRoot = vectorIterator.next()) {
+                //System.out.println(root.contentToTSVString());
+                VectorSchemaRoot newRoot = vectorIterator.next();
+                //System.out.println(newRoot.contentToTSVString());
+                final VectorUnloader unloader = new VectorUnloader(newRoot);
+
+                try (ArrowRecordBatch batch = unloader.getRecordBatch()) {
+                    loader.load(batch);
+                }
+            //}
             return true;
         }
 
@@ -244,6 +251,12 @@ public class JdbcArrowSource extends ConnectorArrowSource
 
         if (vectorIterator != null) {
             vectorIterator.close();
+        }
+        if (root != null) {
+            root.close();
+        }
+        if (allocator != null) {
+            allocator.close();
         }
 
         // use try with resources to close everything properly

@@ -45,9 +45,11 @@ import org.apache.arrow.flight.CallStatus;
 import org.apache.arrow.flight.NoOpFlightProducer;
 import org.apache.arrow.flight.Ticket;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
 
 import javax.inject.Inject;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -162,7 +164,7 @@ public class FlightShimProducer
                 throw new IllegalArgumentException(format("Request has different number of fields than column handles: %d != %d", columnsMetadata.size(), columnHandles.size()));
             }
 
-            try (ConnectorArrowSource arrowSource = createConnectorArrowSource(session, split, tableHandle, columnHandles)) {
+            try (ConnectorArrowSourceWrapper arrowSource = createConnectorArrowSource(session, split, tableHandle, columnHandles)) {
                 listener.setUseZeroCopy(true);
                 listener.start(arrowSource.getVectorSchemaRoot());
                 columnCount = arrowSource.getVectorSchemaRoot().getFieldVectors().size();
@@ -177,6 +179,8 @@ public class FlightShimProducer
                     }
                     rowCount += arrowSource.getVectorSchemaRoot().getRowCount();
                     batchCount++;
+                    //System.out.println("---------------\n" + arrowSource.getVectorSchemaRoot().contentToTSVString() + "\n----------------");
+                    log.info("value: " + arrowSource.getVectorSchemaRoot().getFieldVectors().get(0).getObject(0));
                     listener.putNext();
                 }
                 listener.completed();
@@ -192,14 +196,42 @@ public class FlightShimProducer
         }
     }
 
-    protected ConnectorArrowSource createConnectorArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles)
+    static class ConnectorArrowSourceWrapper
+            implements AutoCloseable
+    {
+        private final ConnectorArrowSourceBase base;
+
+        public ConnectorArrowSourceWrapper(ConnectorArrowSourceBase base)
+        {
+            this.base = base;
+        }
+
+        public VectorSchemaRoot getVectorSchemaRoot()
+        {
+            return (VectorSchemaRoot) base.getVectorSchemaRoot();
+        }
+
+        public boolean nextArrowBatch()
+        {
+            return base.nextArrowBatch();
+        }
+
+        @Override
+        public void close()
+                throws IOException
+        {
+            base.close();
+        }
+    }
+
+    private ConnectorArrowSourceWrapper createConnectorArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles)
     {
         try {
             ConnectorArrowSourceBase connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
-            if (connectorArrowSource instanceof ConnectorArrowSource) {
+            //if (connectorArrowSource instanceof ConnectorArrowSource) {
                 log.debug("Using ConnectorArrowSource");
-                return (ConnectorArrowSource) connectorArrowSource;
-            }
+                return new ConnectorArrowSourceWrapper(connectorArrowSource);
+            //}
         }
         catch (UnsupportedOperationException e)
         {
@@ -207,7 +239,7 @@ public class FlightShimProducer
             throw e;
         }
 
-        throw new IllegalArgumentException("Must use ConnectorArrowSourceImpl");
+        //throw new IllegalArgumentException("Must use ConnectorArrowSourceImpl");
     }
 
     public void shutdown()

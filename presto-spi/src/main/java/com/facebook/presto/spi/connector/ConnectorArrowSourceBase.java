@@ -24,6 +24,7 @@ public abstract class ConnectorArrowSourceBase
     public static final String CONNECTOR_ARROW_SOURCE_ENABLED = "connector-arrow-source-enabled";
 
     //public abstract VectorSchemaRootHolder getVectorSchemaRootHolder();
+    public abstract Object getVectorSchemaRoot();
 
     public abstract boolean nextArrowBatch();
 
