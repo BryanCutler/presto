@@ -14,7 +14,7 @@
 package com.facebook.presto.flightshim;
 
 import com.facebook.plugin.arrow.ArrowBatchSource;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
 import java.io.IOException;
@@ -22,7 +22,7 @@ import java.io.IOException;
 public abstract class ArrowSourceAdapter
         implements AutoCloseable
 {
-    static ArrowSourceAdapter create(ConnectorArrowSourceBase connectorArrowSource)
+    static ArrowSourceAdapter create(ConnectorArrowSource connectorArrowSource)
     {
         return new ArrowSourceWrapper(connectorArrowSource);
     }
@@ -39,9 +39,9 @@ public abstract class ArrowSourceAdapter
     static class ArrowSourceWrapper
             extends ArrowSourceAdapter
     {
-        private final ConnectorArrowSourceBase connectorArrowSource;
+        private final ConnectorArrowSource connectorArrowSource;
 
-        public ArrowSourceWrapper(ConnectorArrowSourceBase connectorArrowSource)
+        public ArrowSourceWrapper(ConnectorArrowSource connectorArrowSource)
         {
             this.connectorArrowSource = connectorArrowSource;
         }

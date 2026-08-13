@@ -11,21 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.plugin.arrow;
+package com.facebook.presto.spi.connector;
 
 import com.facebook.presto.common.Page;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
+import com.facebook.presto.spi.ConnectorPageSource;
 
 import java.io.IOException;
 
 public abstract class ConnectorArrowSource
-        extends ConnectorArrowSourceBase
+        implements ConnectorPageSource
 {
-    public static final String CONNECTOR_ARROW_SOURCE_ENABLED = "connector-arrow-source-enabled";
+    // TODO avoiding adding arrow dep to spi
+    public abstract Object getVectorSchemaRoot();
 
-    public abstract VectorSchemaRoot getVectorSchemaRoot();
+    public abstract boolean nextArrowBatch();
 
     @Override
     public long getCompletedBytes()
@@ -69,28 +68,4 @@ public abstract class ConnectorArrowSource
     {
 
     }
-
-    public static class BufferAllocatorHolder extends ConnectorArrowSourceBase.BufferAllocatorHolder
-    {
-        private final BufferAllocator allocator;
-
-        public BufferAllocatorHolder(BufferAllocator allocator)
-        {
-            this.allocator = allocator;
-        }
-
-        public BufferAllocator getBufferAllocator()
-        {
-            return allocator;
-        }
-    }
-
-    /*public static class VectorSchemaRootHolder extends ConnectorArrowSource.VectorSchemaRootHolder
-    {
-
-        public VectorSchemaRoot getVectorSchemaRoot()
-        {
-
-        }
-    }*/
 }

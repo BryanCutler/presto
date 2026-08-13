@@ -19,7 +19,7 @@ import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.TableHandle;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 
 import java.util.List;
 
@@ -27,7 +27,8 @@ public interface PageSourceProvider
 {
     ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats);
 
-    default ConnectorArrowSourceBase createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, Object holder)
+    // TODO using Object bufferAllocator to avoid arrow in spi
+    default ConnectorArrowSource createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, Object bufferAllocator)
     {
         throw new UnsupportedOperationException();
     }
