@@ -17,7 +17,6 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
-import com.facebook.plugin.arrow.ConnectorArrowSource;
 import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
@@ -179,8 +178,6 @@ public class FlightShimProducer
                     }
                     rowCount += arrowSource.getVectorSchemaRoot().getRowCount();
                     batchCount++;
-                    //System.out.println("---------------\n" + arrowSource.getVectorSchemaRoot().contentToTSVString() + "\n----------------");
-                    log.info("value: " + arrowSource.getVectorSchemaRoot().getFieldVectors().get(0).getObject(0));
                     listener.putNext();
                 }
                 listener.completed();

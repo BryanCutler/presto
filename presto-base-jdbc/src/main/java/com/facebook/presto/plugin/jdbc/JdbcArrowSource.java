@@ -17,18 +17,21 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
-import org.apache.arrow.adapter.jdbc.ArrowVectorIterator;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
+import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
+import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
+import org.apache.arrow.vector.AllocationHelper;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.VectorUnloader;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.vector.util.ValueVectorUtility;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -40,18 +43,17 @@ import java.util.stream.Collectors;
 import static com.facebook.plugin.arrow.BlockArrowWriter.prestoToArrowField;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static java.util.Objects.requireNonNull;
+import static org.apache.arrow.adapter.jdbc.JdbcToArrowUtils.getConsumer;
 
 public class JdbcArrowSource extends ConnectorArrowSourceBase
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
-    private final JdbcColumnHandle[] columnHandles;
     private final Schema schema;
-    ArrowVectorIterator vectorIterator;
+    CompositeJdbcConsumer compositeConsumer;
+    int recordBatchSize;
     VectorSchemaRoot root;
-    VectorLoader loader;
     BufferAllocator allocator;
-    boolean hasNext;
 
     private final JdbcClient jdbcClient;
     private final Connection connection;
@@ -62,7 +64,6 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
     public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, Object holder)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
-        this.columnHandles = columnHandleList.toArray(new JdbcColumnHandle[0]);
 
         List<Field> fields = columnHandleList.stream().map(columnHandle -> prestoToArrowField(columnHandle.getColumnMetadata())).collect(Collectors.toList());
         this.schema = new Schema(fields);
@@ -77,27 +78,36 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
             throw handleSqlException(e);
         }
 
+        // TODO
         if (!(holder instanceof BufferAllocator)) {
             throw new IllegalArgumentException("Expected ConnectorArrowSourceImpl.BufferAllocatorHolder");
         }
 
         this.allocator = ((BufferAllocator) holder).newChildAllocator("jdbc-arrow-source", 0, Long.MAX_VALUE);
-
         this.root = VectorSchemaRoot.create(schema, allocator);
-        // TODO need to make sure schemas equal
-        this.loader = new VectorLoader(root);
+        this.recordBatchSize = recordBatchSize;
 
-        try {
-            JdbcToArrowConfig config =
-                    new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
-                            //.setArraySubTypeByColumnNameMap(ARRAY_SUB_TYPE_BY_COLUMN_NAME_MAP)
-                            .build();
+        JdbcToArrowConfig config =
+                new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
+                        //.setArraySubTypeByColumnNameMap(ARRAY_SUB_TYPE_BY_COLUMN_NAME_MAP)
+                        .build();
 
-            vectorIterator = ArrowVectorIterator.create(resultSet, config);
+        int columnCount = columnHandleList.size();
+        JdbcConsumer<?>[] consumers = new JdbcConsumer[columnCount];
+        for (int i = 0; i < columnCount; i++) {
+            FieldVector vector = root.getVector(i);
+            consumers[i] =
+                    getConsumer(
+                            vector.getField().getType(),
+                            i + 1, // ResultSetMetaData columns have indices starting at 1
+                            columnHandleList.get(i).isNullable(),
+                            vector,
+                            config);
         }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
+
+        compositeConsumer = new CompositeJdbcConsumer(consumers);
+
+        ValueVectorUtility.ensureCapacity(root, recordBatchSize);
     }
 
     @Override
@@ -110,22 +120,28 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
     public boolean nextArrowBatch()
     {
         root.clear();
+        compositeConsumer.resetVectorSchemaRoot(root);
 
-        if (vectorIterator.hasNext()) {
-            //try (VectorSchemaRoot newRoot = vectorIterator.next()) {
-                //System.out.println(root.contentToTSVString());
-                VectorSchemaRoot newRoot = vectorIterator.next();
-                //System.out.println(newRoot.contentToTSVString());
-                final VectorUnloader unloader = new VectorUnloader(newRoot);
-
-                try (ArrowRecordBatch batch = unloader.getRecordBatch()) {
-                    loader.load(batch);
-                }
-            //}
-            return true;
+        // Ensure capacity
+        for (ValueVector vector : root.getFieldVectors()) {
+            vector.setInitialCapacity(recordBatchSize);
+            AllocationHelper.allocateNew(vector, recordBatchSize);
         }
 
-        return false;
+        try {
+            int readRowCount = 0;
+
+            while (readRowCount < recordBatchSize && resultSet.next()) {
+                compositeConsumer.consume(resultSet);
+                readRowCount++;
+            }
+
+            root.setRowCount(readRowCount);
+            return readRowCount > 0;
+        }
+        catch (SQLException | IOException | RuntimeException e) {
+            throw handleSqlException(e);
+        }
     }
 
     @Override
@@ -249,16 +265,6 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
         }
         closed = true;
 
-        if (vectorIterator != null) {
-            vectorIterator.close();
-        }
-        if (root != null) {
-            root.close();
-        }
-        if (allocator != null) {
-            allocator.close();
-        }
-
         // use try with resources to close everything properly
         try (Connection connection = this.connection;
                 Statement statement = this.statement;
@@ -267,6 +273,16 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
         }
         catch (SQLException e) {
             // ignore exception from close
+        }
+
+        if (compositeConsumer != null) {
+            compositeConsumer.close();
+        }
+        if (root != null) {
+            root.close();
+        }
+        if (allocator != null) {
+            allocator.close();
         }
     }
 
