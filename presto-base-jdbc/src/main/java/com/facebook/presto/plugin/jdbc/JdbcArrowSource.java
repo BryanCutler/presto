@@ -16,7 +16,7 @@ package com.facebook.presto.plugin.jdbc;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
@@ -45,15 +45,14 @@ import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static java.util.Objects.requireNonNull;
 import static org.apache.arrow.adapter.jdbc.JdbcToArrowUtils.getConsumer;
 
-public class JdbcArrowSource extends ConnectorArrowSourceBase
+public class JdbcArrowSource extends ConnectorArrowSource
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
-    private final Schema schema;
-    CompositeJdbcConsumer compositeConsumer;
-    int recordBatchSize;
-    VectorSchemaRoot root;
-    BufferAllocator allocator;
+    private final CompositeJdbcConsumer compositeConsumer;
+    private final int recordBatchSize;
+    private final VectorSchemaRoot root;
+    private final BufferAllocator allocator;
 
     private final JdbcClient jdbcClient;
     private final Connection connection;
@@ -66,7 +65,7 @@ public class JdbcArrowSource extends ConnectorArrowSourceBase
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
 
         List<Field> fields = columnHandleList.stream().map(columnHandle -> prestoToArrowField(columnHandle.getColumnMetadata())).collect(Collectors.toList());
-        this.schema = new Schema(fields);
+        Schema schema = new Schema(fields);
 
         try {
             connection = jdbcClient.getConnection(session, JdbcIdentity.from(session), split);

@@ -21,7 +21,7 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.RecordPageSource;
 import com.facebook.presto.spi.SplitContext;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -52,7 +52,7 @@ public class RecordPageSourceProvider
     }
 
     @Override
-    public ConnectorArrowSourceBase createArrowSource(
+    public ConnectorArrowSource createArrowSource(
             ConnectorTransactionHandle transactionHandle,
             ConnectorSession session,
             ConnectorSplit split,
@@ -61,8 +61,8 @@ public class RecordPageSourceProvider
             SplitContext splitContext,
             RuntimeStats runtimeStats,
             int recordBatchSize,
-            Object holder)
+            Object bufferAllocator)
     {
-        return recordSetProvider.createArrowSource(transactionHandle, session, split, layout, columns, splitContext, runtimeStats, recordBatchSize, holder);
+        return recordSetProvider.createArrowSource(transactionHandle, session, split, layout, columns, splitContext, runtimeStats, recordBatchSize, bufferAllocator);
     }
 }

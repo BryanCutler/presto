@@ -19,7 +19,7 @@ import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
 import com.facebook.plugin.arrow.ArrowBatchSource;
 import com.facebook.presto.spi.ConnectorPageSource;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.RuntimeStats;
@@ -46,18 +46,15 @@ import org.apache.arrow.flight.CallStatus;
 import org.apache.arrow.flight.NoOpFlightProducer;
 import org.apache.arrow.flight.Ticket;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
 
 import javax.inject.Inject;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.facebook.presto.spi.connector.ConnectorArrowSourceBase.CONNECTOR_ARROW_SOURCE_ENABLED;
 import static com.facebook.presto.metadata.SessionPropertyManager.createTestingSessionPropertyManager;
 import static com.facebook.presto.testing.TestingSession.DEFAULT_TIME_ZONE_KEY;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -144,7 +141,6 @@ public class FlightShimProducer
                     .setIdentity(new Identity("user", Optional.empty()))
                     .setTimeZoneKey(DEFAULT_TIME_ZONE_KEY)
                     .setLocale(ENGLISH)
-                    .setSystemProperty(CONNECTOR_ARROW_SOURCE_ENABLED, "true")
                     .build();
             ConnectorId connectorId = new ConnectorId(request.getConnectorId());
             Split split = new Split(connectorId, transactionHandle, connectorSplit);
@@ -198,7 +194,7 @@ public class FlightShimProducer
     private ArrowSourceAdapter createArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles, List<ColumnMetadata> columnsMetadata)
     {
         try {
-            ConnectorArrowSourceBase connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
+            ConnectorArrowSource connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
             log.debug("Using ConnectorArrowSource");
             return ArrowSourceAdapter.create(connectorArrowSource);
         }
