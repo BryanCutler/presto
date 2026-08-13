@@ -27,7 +27,8 @@ public interface ConnectorRecordSetProvider
 {
     RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorSplit split, List<? extends ColumnHandle> columns);
 
-    default ConnectorArrowSourceBase createArrowSource(
+    // TODO using Object bufferAllocator to avoid arrow in spi
+    default ConnectorArrowSource createArrowSource(
             ConnectorTransactionHandle transactionHandle,
             ConnectorSession session,
             ConnectorSplit split,
@@ -36,7 +37,7 @@ public interface ConnectorRecordSetProvider
             SplitContext splitContext,
             RuntimeStats runtimeStats,
             int recordBatchSize,
-            Object holder)
+            Object bufferAllocator)
     {
         throw new UnsupportedOperationException();
     }

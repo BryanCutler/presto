@@ -20,7 +20,7 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.SplitContext;
-import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.common.collect.ImmutableList;
@@ -55,7 +55,7 @@ public class JdbcRecordSetProvider
     }
 
     @Override
-    public ConnectorArrowSourceBase createArrowSource(
+    public ConnectorArrowSource createArrowSource(
             ConnectorTransactionHandle transactionHandle,
             ConnectorSession session,
             ConnectorSplit split,
@@ -66,7 +66,6 @@ public class JdbcRecordSetProvider
             int recordBatchSize,
             Object holder)
     {
-        //if (session.getSystemProperties().getOrDefault(CONNECTOR_ARROW_SOURCE_ENABLED, "false").equalsIgnoreCase("true")) {
         JdbcSplit jdbcSplit = (JdbcSplit) split;
 
         ImmutableList.Builder<JdbcColumnHandle> handles = ImmutableList.builder();
