@@ -17,6 +17,8 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
+import com.facebook.plugin.arrow.ArrowBatchSource;
+import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.connector.ConnectorArrowSourceBase;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
@@ -163,7 +165,7 @@ public class FlightShimProducer
                 throw new IllegalArgumentException(format("Request has different number of fields than column handles: %d != %d", columnsMetadata.size(), columnHandles.size()));
             }
 
-            try (ConnectorArrowSourceWrapper arrowSource = createConnectorArrowSource(session, split, tableHandle, columnHandles)) {
+            try (ArrowSourceAdapter arrowSource = createArrowSource(session, split, tableHandle, columnHandles, columnsMetadata)) {
                 listener.setUseZeroCopy(true);
                 listener.start(arrowSource.getVectorSchemaRoot());
                 columnCount = arrowSource.getVectorSchemaRoot().getFieldVectors().size();
@@ -193,50 +195,19 @@ public class FlightShimProducer
         }
     }
 
-    static class ConnectorArrowSourceWrapper
-            implements AutoCloseable
-    {
-        private final ConnectorArrowSourceBase base;
-
-        public ConnectorArrowSourceWrapper(ConnectorArrowSourceBase base)
-        {
-            this.base = base;
-        }
-
-        public VectorSchemaRoot getVectorSchemaRoot()
-        {
-            return (VectorSchemaRoot) base.getVectorSchemaRoot();
-        }
-
-        public boolean nextArrowBatch()
-        {
-            return base.nextArrowBatch();
-        }
-
-        @Override
-        public void close()
-                throws IOException
-        {
-            base.close();
-        }
-    }
-
-    private ConnectorArrowSourceWrapper createConnectorArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles)
+    private ArrowSourceAdapter createArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles, List<ColumnMetadata> columnsMetadata)
     {
         try {
             ConnectorArrowSourceBase connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
-            //if (connectorArrowSource instanceof ConnectorArrowSource) {
-                log.debug("Using ConnectorArrowSource");
-                return new ConnectorArrowSourceWrapper(connectorArrowSource);
-            //}
+            log.debug("Using ConnectorArrowSource");
+            return ArrowSourceAdapter.create(connectorArrowSource);
         }
         catch (UnsupportedOperationException e)
         {
-            //ArrowBatchSource batchSource = ArrowBatchSource.create(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch())
-            throw e;
+            ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
+            log.debug("Using ArrowBatchSource");
+            return ArrowSourceAdapter.create(new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch()));
         }
-
-        //throw new IllegalArgumentException("Must use ConnectorArrowSourceImpl");
     }
 
     public void shutdown()
