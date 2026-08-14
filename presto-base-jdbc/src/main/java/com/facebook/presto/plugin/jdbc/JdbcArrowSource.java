@@ -60,7 +60,7 @@ public class JdbcArrowSource extends ConnectorArrowSource
     private final ResultSet resultSet;
     private boolean closed;
 
-    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, Object holder)
+    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, Object bufferAllocator)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
 
@@ -78,11 +78,11 @@ public class JdbcArrowSource extends ConnectorArrowSource
         }
 
         // TODO
-        if (!(holder instanceof BufferAllocator)) {
+        if (!(bufferAllocator instanceof BufferAllocator)) {
             throw new IllegalArgumentException("Expected ConnectorArrowSourceImpl.BufferAllocatorHolder");
         }
 
-        this.allocator = ((BufferAllocator) holder).newChildAllocator("jdbc-arrow-source", 0, Long.MAX_VALUE);
+        this.allocator = (BufferAllocator) bufferAllocator;
         this.root = VectorSchemaRoot.create(schema, allocator);
         this.recordBatchSize = recordBatchSize;
 
@@ -118,6 +118,10 @@ public class JdbcArrowSource extends ConnectorArrowSource
     @Override
     public boolean nextArrowBatch()
     {
+        if (closed) {
+            return false;
+        }
+
         root.clear();
         compositeConsumer.resetVectorSchemaRoot(root);
 
@@ -274,14 +278,11 @@ public class JdbcArrowSource extends ConnectorArrowSource
             // ignore exception from close
         }
 
-        if (compositeConsumer != null) {
-            compositeConsumer.close();
-        }
         if (root != null) {
             root.close();
         }
-        if (allocator != null) {
-            allocator.close();
+        if (compositeConsumer != null) {
+            compositeConsumer.close();
         }
     }
 
