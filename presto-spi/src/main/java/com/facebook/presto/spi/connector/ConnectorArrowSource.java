@@ -66,6 +66,5 @@ public abstract class ConnectorArrowSource
     public void close()
             throws IOException
     {
-
     }
 }

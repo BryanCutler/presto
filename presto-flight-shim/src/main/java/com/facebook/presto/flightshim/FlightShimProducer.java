@@ -18,8 +18,6 @@ import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
 import com.facebook.plugin.arrow.ArrowBatchSource;
-import com.facebook.presto.spi.ConnectorPageSource;
-import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.RuntimeStats;
@@ -32,10 +30,12 @@ import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
+import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.split.PageSourceManager;
@@ -198,8 +198,7 @@ public class FlightShimProducer
             log.debug("Using ConnectorArrowSource");
             return ArrowSourceAdapter.create(connectorArrowSource);
         }
-        catch (UnsupportedOperationException e)
-        {
+        catch (UnsupportedOperationException e) {
             ConnectorPageSource connectorPageSource = pageSourceManager.createPageSource(session, split, tableHandle, columnHandles, new RuntimeStats());
             log.debug("Using ArrowBatchSource");
             return ArrowSourceAdapter.create(new ArrowBatchSource(allocator, columnsMetadata, connectorPageSource, config.getMaxRowsPerBatch()));
