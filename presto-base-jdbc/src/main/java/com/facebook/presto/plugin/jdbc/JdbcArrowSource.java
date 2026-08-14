@@ -45,7 +45,8 @@ import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static java.util.Objects.requireNonNull;
 import static org.apache.arrow.adapter.jdbc.JdbcToArrowUtils.getConsumer;
 
-public class JdbcArrowSource extends ConnectorArrowSource
+public class JdbcArrowSource
+        extends ConnectorArrowSource
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
