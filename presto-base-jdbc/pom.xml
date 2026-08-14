@@ -133,8 +133,39 @@
 
         <dependency>
             <groupId>org.apache.arrow</groupId>
+            <artifactId>arrow-memory-core</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.arrow</groupId>
             <artifactId>arrow-vector</artifactId>
             <version>${dep.arrow.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.datatype</groupId>
+                    <artifactId>jackson-datatype-jsr310</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
 
         <dependency>
@@ -178,18 +209,6 @@
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>json</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -253,7 +272,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-core</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>javax.inject:javax.inject</ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
                 </configuration>
