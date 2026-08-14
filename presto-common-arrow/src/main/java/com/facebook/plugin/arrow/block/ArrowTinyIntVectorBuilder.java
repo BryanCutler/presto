@@ -17,7 +17,7 @@ import com.facebook.presto.common.block.BlockBuilder;
 import org.apache.arrow.vector.TinyIntVector;
 
 public class ArrowTinyIntVectorBuilder
-    extends ArrowVectorBuilder
+        extends ArrowVectorBuilder
 {
     private final TinyIntVector vector;
 

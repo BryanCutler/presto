@@ -17,7 +17,7 @@ import com.facebook.presto.common.block.BlockBuilder;
 import org.apache.arrow.vector.BitVector;
 
 public class ArrowBitVectorBuilder
-    extends ArrowVectorBuilder
+        extends ArrowVectorBuilder
 {
     private final BitVector vector;
 

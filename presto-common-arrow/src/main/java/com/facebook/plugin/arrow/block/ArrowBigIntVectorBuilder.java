@@ -17,7 +17,7 @@ import com.facebook.presto.common.block.BlockBuilder;
 import org.apache.arrow.vector.BigIntVector;
 
 public class ArrowBigIntVectorBuilder
-    extends ArrowVectorBuilder
+        extends ArrowVectorBuilder
 {
     private final BigIntVector vector;
 

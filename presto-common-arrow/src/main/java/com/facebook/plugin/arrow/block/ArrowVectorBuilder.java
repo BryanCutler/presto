@@ -109,7 +109,6 @@ public abstract class ArrowVectorBuilder
     @Override
     public void retainedBytesForEachPart(ObjLongConsumer<Object> consumer)
     {
-
         throw new UnsupportedOperationException();
     }
 

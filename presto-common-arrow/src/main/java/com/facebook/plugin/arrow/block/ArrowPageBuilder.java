@@ -33,7 +33,6 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.facebook.plugin.arrow.ArrowErrorCode.ARROW_FLIGHT_TYPE_ERROR;
@@ -42,65 +41,14 @@ import static java.util.Objects.requireNonNull;
 
 public class ArrowPageBuilder
 {
-    // We choose default initial size to be 8 for PageBuilder and BlockBuilder
-    // so the underlying data is larger than the object overhead, and the size is power of 2.
-    //
-    // This could be any other small number.
-    private static final int DEFAULT_INITIAL_EXPECTED_ENTRIES = 8;
-
     private final ArrowVectorBuilder[] blockBuilders;
-    //private final List<Type> types;
     private PageBuilderStatus pageBuilderStatus;
     private int declaredPositions;
-    //private final VectorSchemaRoot root;
 
-    /**
-     * Create a PageBuilder with given types.
-     * <p>
-     * A PageBuilder instance created with this constructor has no estimation about bytes per entry,
-     * therefore it can resize frequently while appending new rows.
-     * <p>
-     * This constructor should only be used to get the initial PageBuilder.
-     * Once the PageBuilder is full use reset() or newPageBuilderLike() to create a new
-     * PageBuilder instance with its size estimated based on previous data.
-     */
-    /*public ArrowPageBuilder(List<? extends Type> types)
-    {
-        this(DEFAULT_INITIAL_EXPECTED_ENTRIES, types);
-    }
-
-    public ArrowPageBuilder(int initialExpectedEntries, List<? extends Type> types)
-    {
-        this(initialExpectedEntries, DEFAULT_MAX_PAGE_SIZE_IN_BYTES, types, Optional.empty());
-    }
-
-    public static ArrowPageBuilder withMaxPageSize(int maxPageBytes, List<? extends Type> types)
-    {
-        return new ArrowPageBuilder(DEFAULT_INITIAL_EXPECTED_ENTRIES, maxPageBytes, types, Optional.empty());
-    }*/
-
-    //private ArrowPageBuilder(int initialExpectedEntries, int maxPageBytes, List<? extends Type> types, Optional<BlockBuilder[]> templateBlockBuilders)
     public ArrowPageBuilder(BufferAllocator allocator, List<ColumnMetadata> columns)
     {
         requireNonNull(allocator, "allocator is null");
         requireNonNull(columns, "columns is null");
-        /*this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
-
-        pageBuilderStatus = new PageBuilderStatus(maxPageBytes);
-        blockBuilders = new BlockBuilder[types.size()];
-
-        if (templateBlockBuilders.isPresent()) {
-            BlockBuilder[] templates = templateBlockBuilders.get();
-            checkArgument(templates.length == types.size(), "Size of templates and types should match");
-            for (int i = 0; i < blockBuilders.length; i++) {
-                blockBuilders[i] = templates[i].newBlockBuilderLike(pageBuilderStatus.createBlockBuilderStatus());
-            }
-        }
-        else {
-            for (int i = 0; i < blockBuilders.length; i++) {
-                blockBuilders[i] = types.get(i).createBlockBuilder(pageBuilderStatus.createBlockBuilderStatus(), initialExpectedEntries);
-            }
-        }*/
         this.blockBuilders = null;
     }
 
@@ -112,10 +60,6 @@ public class ArrowPageBuilder
         pageBuilderStatus = new PageBuilderStatus(pageBuilderStatus.getMaxPageSizeInBytes());
 
         declaredPositions = 0;
-
-        //for (int i = 0; i < blockBuilders.length; i++) {
-        //    blockBuilders[i] = blockBuilders[i].newBlockBuilderLike(pageBuilderStatus.createBlockBuilderStatus());
-        //}
     }
 
     private void createArrowVectorBuilders(BufferAllocator allocator, List<ColumnMetadata> columns)
@@ -131,11 +75,11 @@ public class ArrowPageBuilder
             blockBuilders[i] = createArrowVectorBuilder(vectors.get(i), columnMetadata.getType());
         }
     }
-    
+
     private ArrowVectorBuilder createArrowVectorBuilder(FieldVector vector, Type type)
     {
-        //Class<?> javaType = type.getJavaType();
-        
+        // Class<?> javaType = type.getJavaType();
+
         switch (vector.getMinorType()) {
             case BIT:
                 //checkArgument(javaType == boolean.class, "Unexpected type for BitVector: %s", type);
@@ -191,13 +135,12 @@ public class ArrowPageBuilder
                 return new ArrowStructWriter((StructVector) vector, new BlockRowGetter((RowType) type));*/
             default:
                 throw new ArrowException(ARROW_FLIGHT_TYPE_ERROR, "Unsupported Arrow type: " + vector.getMinorType().name());
-        } 
+        }
     }
 
     public ArrowPageBuilder newPageBuilderLike()
     {
         throw new UnsupportedOperationException();
-        //return new ArrowPageBuilder(declaredPositions, pageBuilderStatus.getMaxPageSizeInBytes(), types, Optional.of(blockBuilders));
     }
 
     public BlockBuilder getBlockBuilder(int channel)
@@ -207,7 +150,7 @@ public class ArrowPageBuilder
 
     public Type getType(int channel)
     {
-        return null;//types.get(channel);
+        return null; // types.get(channel);
     }
 
     public void declarePosition()
