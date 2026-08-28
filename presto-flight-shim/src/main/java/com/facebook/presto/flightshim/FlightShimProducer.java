@@ -18,6 +18,7 @@ import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
 import com.facebook.plugin.arrow.ArrowBatchSource;
+import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.RuntimeStats;
@@ -194,7 +195,8 @@ public class FlightShimProducer
     private ArrowSourceAdapter createArrowSource(Session session, Split split, TableHandle tableHandle, List<ColumnHandle> columnHandles, List<ColumnMetadata> columnsMetadata)
     {
         try {
-            ConnectorArrowSource connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), allocator);
+            ConnectorArrowSourceAdapter.BufferAllocatorHolderImpl bufferAllocatorHolder = new ConnectorArrowSourceAdapter.BufferAllocatorHolderImpl(allocator);
+            ConnectorArrowSource connectorArrowSource = pageSourceManager.createArrowSource(session, split, tableHandle, columnHandles, new RuntimeStats(), config.getMaxRowsPerBatch(), bufferAllocatorHolder);
             log.debug("Using ConnectorArrowSource");
             return ArrowSourceAdapter.create(connectorArrowSource);
         }

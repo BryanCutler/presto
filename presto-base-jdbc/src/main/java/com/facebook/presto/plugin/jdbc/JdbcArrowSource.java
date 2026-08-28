@@ -14,6 +14,7 @@
 package com.facebook.presto.plugin.jdbc;
 
 import com.facebook.airlift.log.Logger;
+import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorArrowSource;
@@ -22,7 +23,6 @@ import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
 import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
 import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.AllocationHelper;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.ValueVector;
@@ -46,14 +46,13 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.arrow.adapter.jdbc.JdbcToArrowUtils.getConsumer;
 
 public class JdbcArrowSource
-        extends ConnectorArrowSource
+        extends ConnectorArrowSourceAdapter
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
     private final CompositeJdbcConsumer compositeConsumer;
     private final int recordBatchSize;
     private final VectorSchemaRoot root;
-    private final BufferAllocator allocator;
 
     private final JdbcClient jdbcClient;
     private final Connection connection;
@@ -61,10 +60,13 @@ public class JdbcArrowSource
     private final ResultSet resultSet;
     private boolean closed;
 
-    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, Object bufferAllocator)
+    public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
+        super(bufferAllocatorHolder);
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
 
+        requireNonNull(session, "session is null");
+        requireNonNull(columnHandleList, "columnHandleList is null");
         List<Field> fields = columnHandleList.stream().map(columnHandle -> prestoToArrowField(columnHandle.getColumnMetadata())).collect(Collectors.toList());
         Schema schema = new Schema(fields);
 
@@ -78,12 +80,6 @@ public class JdbcArrowSource
             throw handleSqlException(e);
         }
 
-        // TODO
-        if (!(bufferAllocator instanceof BufferAllocator)) {
-            throw new IllegalArgumentException("Expected ConnectorArrowSourceImpl.BufferAllocatorHolder");
-        }
-
-        this.allocator = (BufferAllocator) bufferAllocator;
         this.root = VectorSchemaRoot.create(schema, allocator);
         this.recordBatchSize = recordBatchSize;
 
@@ -111,7 +107,7 @@ public class JdbcArrowSource
     }
 
     @Override
-    public Object getVectorSchemaRoot()
+    public VectorSchemaRoot getVectorSchemaRoot()
     {
         return root;
     }

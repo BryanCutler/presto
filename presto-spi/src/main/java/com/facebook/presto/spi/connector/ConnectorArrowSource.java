@@ -21,8 +21,7 @@ import java.io.IOException;
 public abstract class ConnectorArrowSource
         implements ConnectorPageSource
 {
-    // TODO avoiding adding arrow dep to spi
-    public abstract Object getVectorSchemaRoot();
+    public abstract VectorSchemaRootHolder getVectorSchemaRootHolder();
 
     public abstract boolean nextArrowBatch();
 
@@ -65,6 +64,14 @@ public abstract class ConnectorArrowSource
     @Override
     public void close()
             throws IOException
+    {
+    }
+
+    public interface BufferAllocatorHolder
+    {
+    }
+
+    public interface VectorSchemaRootHolder
     {
     }
 }

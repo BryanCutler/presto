@@ -64,7 +64,7 @@ public class JdbcRecordSetProvider
             SplitContext splitContext,
             RuntimeStats runtimeStats,
             int recordBatchSize,
-            Object holder)
+            ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
         JdbcSplit jdbcSplit = (JdbcSplit) split;
 
@@ -73,6 +73,6 @@ public class JdbcRecordSetProvider
             handles.add((JdbcColumnHandle) handle);
         }
 
-        return new JdbcArrowSource(jdbcClient, session, jdbcSplit, handles.build(), recordBatchSize, holder);
+        return new JdbcArrowSource(jdbcClient, session, jdbcSplit, handles.build(), recordBatchSize, bufferAllocatorHolder);
     }
 }
