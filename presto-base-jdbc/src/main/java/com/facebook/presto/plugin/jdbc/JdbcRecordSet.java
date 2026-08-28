@@ -36,8 +36,6 @@ public class JdbcRecordSet
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
         this.split = requireNonNull(split, "split is null");
-
-        requireNonNull(split, "split is null");
         this.columnHandles = requireNonNull(columnHandles, "column handles is null");
         ImmutableList.Builder<Type> types = ImmutableList.builder();
         for (JdbcColumnHandle column : columnHandles) {

@@ -55,7 +55,6 @@ public interface ConnectorPageSourceProvider
         return createPageSource(transactionHandle, session, split, columns, splitContext);
     }
 
-    // TODO using Object bufferAllocator to avoid arrow in spi
     default ConnectorArrowSource createArrowSource(
             ConnectorTransactionHandle transactionHandle,
             ConnectorSession session,
@@ -65,7 +64,7 @@ public interface ConnectorPageSourceProvider
             SplitContext splitContext,
             RuntimeStats runtimeStats,
             int recordBatchSize,
-            Object bufferAllocator)
+            ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
         throw new UnsupportedOperationException();
     }

@@ -27,8 +27,7 @@ public interface PageSourceProvider
 {
     ConnectorPageSource createPageSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats);
 
-    // TODO using Object bufferAllocator to avoid arrow in spi
-    default ConnectorArrowSource createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, Object bufferAllocator)
+    default ConnectorArrowSource createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
         throw new UnsupportedOperationException();
     }

@@ -14,6 +14,7 @@
 package com.facebook.presto.flightshim;
 
 import com.facebook.plugin.arrow.ArrowBatchSource;
+import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
 import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
@@ -49,7 +50,11 @@ public abstract class ArrowSourceAdapter
         @Override
         public VectorSchemaRoot getVectorSchemaRoot()
         {
-            return (VectorSchemaRoot) connectorArrowSource.getVectorSchemaRoot();
+            if (!(connectorArrowSource.getVectorSchemaRootHolder() instanceof ConnectorArrowSourceAdapter.VectorSchemaRootHolderImpl)) {
+                throw new IllegalArgumentException("Expected ConnectorArrowSourceAdapter.VectorSchemaRootHolderImpl");
+            }
+
+            return ((ConnectorArrowSourceAdapter.VectorSchemaRootHolderImpl) connectorArrowSource.getVectorSchemaRootHolder()).getVectorSchemaRoot();
         }
 
         @Override

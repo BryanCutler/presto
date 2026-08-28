@@ -61,8 +61,8 @@ public class RecordPageSourceProvider
             SplitContext splitContext,
             RuntimeStats runtimeStats,
             int recordBatchSize,
-            Object bufferAllocator)
+            ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
-        return recordSetProvider.createArrowSource(transactionHandle, session, split, layout, columns, splitContext, runtimeStats, recordBatchSize, bufferAllocator);
+        return recordSetProvider.createArrowSource(transactionHandle, session, split, layout, columns, splitContext, runtimeStats, recordBatchSize, bufferAllocatorHolder);
     }
 }

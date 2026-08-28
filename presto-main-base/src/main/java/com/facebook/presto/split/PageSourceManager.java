@@ -102,10 +102,10 @@ public class PageSourceManager
     }
 
     @Override
-    public ConnectorArrowSource createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, Object bufferAllocator)
+    public ConnectorArrowSource createArrowSource(Session session, Split split, TableHandle table, List<ColumnHandle> columns, RuntimeStats runtimeStats, int recordBatchSize, ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
     {
         ConnectorSession connectorSession = session.toConnectorSession(split.getConnectorId());
         ConnectorTableLayoutHandle layoutHandle = table.getLayout().orElse(null);
-        return getPageSourceProvider(split).createArrowSource(split.getTransactionHandle(), connectorSession, split.getConnectorSplit(), layoutHandle, columns, split.getSplitContext(), runtimeStats, recordBatchSize, bufferAllocator);
+        return getPageSourceProvider(split).createArrowSource(split.getTransactionHandle(), connectorSession, split.getConnectorSplit(), layoutHandle, columns, split.getSplitContext(), runtimeStats, recordBatchSize, bufferAllocatorHolder);
     }
 }
