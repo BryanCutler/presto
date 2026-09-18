@@ -13,14 +13,10 @@
  */
 package com.facebook.presto.plugin.jdbc;
 
-import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
-import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.RecordSet;
-import com.facebook.presto.spi.SplitContext;
-import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.common.collect.ImmutableList;
@@ -52,27 +48,5 @@ public class JdbcRecordSetProvider
         }
 
         return new JdbcRecordSet(jdbcClient, session, jdbcSplit, handles.build());
-    }
-
-    @Override
-    public ConnectorArrowSource createArrowSource(
-            ConnectorTransactionHandle transactionHandle,
-            ConnectorSession session,
-            ConnectorSplit split,
-            ConnectorTableLayoutHandle layout,
-            List<ColumnHandle> columns,
-            SplitContext splitContext,
-            RuntimeStats runtimeStats,
-            int recordBatchSize,
-            ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
-    {
-        JdbcSplit jdbcSplit = (JdbcSplit) split;
-
-        ImmutableList.Builder<JdbcColumnHandle> handles = ImmutableList.builder();
-        for (ColumnHandle handle : columns) {
-            handles.add((JdbcColumnHandle) handle);
-        }
-
-        return new JdbcArrowSource(jdbcClient, session, jdbcSplit, handles.build(), recordBatchSize, bufferAllocatorHolder);
     }
 }
