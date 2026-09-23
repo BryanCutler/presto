@@ -58,6 +58,12 @@
             <artifactId>presto-common</artifactId>
         </dependency>
 
+        <!-- This is needed to resolve ConnectorArrowSourceAdapter in spiClassLoader -->
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-common-arrow</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-function-namespace-managers-common</artifactId>
@@ -527,6 +533,9 @@
                         <ignoredUsedUndeclaredDependency>com.squareup.okhttp3:okhttp-jvm</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>com.squareup.okhttp3:okhttp-urlconnection</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
+                    <ignoredDependencies>
+                        <ignoredDependency>com.facebook.presto:presto-common-arrow</ignoredDependency>
+                    </ignoredDependencies>
                 </configuration>
             </plugin>
         </plugins>

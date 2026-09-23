@@ -66,6 +66,8 @@ public class FunctionPluginManager
             .add("com.facebook.drift.annotations.")
             .add("com.facebook.drift.TException")
             .add("com.facebook.drift.TApplicationException")
+            .add("com.facebook.plugin.arrow.")
+            .add("org.apache.arrow.")
             .build();
 
     //  TODO: Add plugins based on FunctionPlugin interface. Currently loading the plugins implemented on Plugin interface to the Function Server for now.
