@@ -20,6 +20,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
+import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
 import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
 import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
 import org.apache.arrow.vector.AllocationHelper;
@@ -84,7 +85,7 @@ public class JdbcArrowSource
         this.recordBatchSize = recordBatchSize;
 
         JdbcToArrowConfig config =
-                new JdbcToArrowConfigBuilder(allocator, null).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
+                new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
                         .build();
 
         int columnCount = columnHandleList.size();

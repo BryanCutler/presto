@@ -56,6 +56,7 @@ import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.complex.StructVector;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -86,6 +87,8 @@ import static java.lang.String.format;
 
 public class BlockArrowWriter
 {
+    private static final ArrowType ARROW_TYPE_TIMESTAMP_UTC = new ArrowType.Timestamp(TimeUnit.MILLISECOND, "UTC");
+
     private BlockArrowWriter()
     {
     }
@@ -173,11 +176,12 @@ public class BlockArrowWriter
             return Types.MinorType.TIMEMILLI.getType();
         }
         else if (type instanceof TimestampType) {
-            return Types.MinorType.TIMESTAMPMILLI.getType();
+            // This type will create a TimeStampMilliTZVector with UTC, can be used as TimeStampMilliVector
+            return ARROW_TYPE_TIMESTAMP_UTC;
         }
         else if (type instanceof TimestampWithTimeZoneType) {
             // Read as plain timestamp and unpack to UTC, timezone not supplied with type
-            return Types.MinorType.TIMESTAMPMILLI.getType();
+            return ARROW_TYPE_TIMESTAMP_UTC;
         }
         throw new ArrowException(ARROW_FLIGHT_TYPE_ERROR, "Unsupported type: " + type);
     }
