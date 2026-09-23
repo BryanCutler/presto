@@ -20,7 +20,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
-import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
 import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
 import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
 import org.apache.arrow.vector.AllocationHelper;
@@ -58,6 +57,7 @@ public class JdbcArrowSource
     private final Connection connection;
     private final PreparedStatement statement;
     private final ResultSet resultSet;
+    private boolean finished;
     private boolean closed;
 
     public JdbcArrowSource(JdbcClient jdbcClient, ConnectorSession session, JdbcSplit split, List<JdbcColumnHandle> columnHandleList, int recordBatchSize, ConnectorArrowSource.BufferAllocatorHolder bufferAllocatorHolder)
@@ -84,8 +84,7 @@ public class JdbcArrowSource
         this.recordBatchSize = recordBatchSize;
 
         JdbcToArrowConfig config =
-                new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
-                        //.setArraySubTypeByColumnNameMap(ARRAY_SUB_TYPE_BY_COLUMN_NAME_MAP)
+                new JdbcToArrowConfigBuilder(allocator, null).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
                         .build();
 
         int columnCount = columnHandleList.size();
@@ -115,7 +114,7 @@ public class JdbcArrowSource
     @Override
     public boolean nextArrowBatch()
     {
-        if (closed) {
+        if (closed || finished) {
             return false;
         }
 
@@ -131,9 +130,14 @@ public class JdbcArrowSource
         try {
             int readRowCount = 0;
 
-            while (readRowCount < recordBatchSize && resultSet.next()) {
-                compositeConsumer.consume(resultSet);
-                readRowCount++;
+            while ((readRowCount < recordBatchSize) && !finished) {
+                if (resultSet.next()) {
+                    compositeConsumer.consume(resultSet);
+                    readRowCount++;
+                }
+                else {
+                    finished = true;
+                }
             }
 
             root.setRowCount(readRowCount);
@@ -145,116 +149,10 @@ public class JdbcArrowSource
     }
 
     @Override
-    public long getReadTimeNanos()
+    public boolean isFinished()
     {
-        return 0;
+        return closed || finished;
     }
-
-    @Override
-    public long getCompletedBytes()
-    {
-        return 0;
-    }
-
-    /*@Override
-    public Type getType(int field)
-    {
-        return columnHandles[field].getColumnType();
-    }
-
-    @Override
-    public boolean advanceNextPosition()
-    {
-        if (closed) {
-            return false;
-        }
-
-        try {
-            return resultSet.next();
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public boolean getBoolean(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        try {
-            return booleanReadFunctions[field].readBoolean(resultSet, field + 1);
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public long getLong(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        try {
-            return longReadFunctions[field].readLong(resultSet, field + 1);
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public double getDouble(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        try {
-            return doubleReadFunctions[field].readDouble(resultSet, field + 1);
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public Slice getSlice(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        try {
-            return sliceReadFunctions[field].readSlice(resultSet, field + 1);
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public Object getObject(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        try {
-            return objectReadFunctions[field].readObject(resultSet, field + 1);
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }
-
-    @Override
-    public boolean isNull(int field)
-    {
-        checkState(!closed, "cursor is closed");
-        checkArgument(field < columnHandles.length, "Invalid field index");
-
-        try {
-            // JDBC is kind of dumb: we need to read the field and then ask
-            // if it was null, which means we are wasting effort here.
-            // We could save the result of the field access if it matters.
-            resultSet.getObject(field + 1);
-
-            return resultSet.wasNull();
-        }
-        catch (SQLException | RuntimeException e) {
-            throw handleSqlException(e);
-        }
-    }*/
 
     @SuppressWarnings("UnusedDeclaration")
     @Override

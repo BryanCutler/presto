@@ -16,8 +16,6 @@ package com.facebook.presto.spi.connector;
 import com.facebook.presto.common.Page;
 import com.facebook.presto.spi.ConnectorPageSource;
 
-import java.io.IOException;
-
 public abstract class ConnectorArrowSource
         implements ConnectorPageSource
 {
@@ -44,27 +42,15 @@ public abstract class ConnectorArrowSource
     }
 
     @Override
-    public boolean isFinished()
-    {
-        return false;
-    }
-
-    @Override
     public Page getNextPage()
     {
-        return null;
+        throw new UnsupportedOperationException("This source only produces Arrow batches");
     }
 
     @Override
     public long getSystemMemoryUsage()
     {
         return 0;
-    }
-
-    @Override
-    public void close()
-            throws IOException
-    {
     }
 
     public interface BufferAllocatorHolder
