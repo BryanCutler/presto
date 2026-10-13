@@ -245,6 +245,7 @@ public class BlockArrowWriter
                 }
                 return new ArrowTimeWriter((TimeMilliVector) vector, new BlockPrimitiveGetter(type));
             case TIMESTAMPMILLI:
+            case TIMESTAMPMILLITZ:
                 checkArgument(javaType == long.class, "Unexpected type for TimeStampVector: %s", type);
                 if (type instanceof TimestampWithTimeZoneType) {
                     return new ArrowTimeStampWithTimeZoneWriter((TimeStampVector) vector, new BlockPrimitiveGetter(type));
