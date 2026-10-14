@@ -18,6 +18,7 @@ import com.facebook.airlift.json.JsonCodecFactory;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.resolver.ArtifactResolver;
+import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
 import com.facebook.presto.block.BlockJsonSerde;
 import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.block.BlockEncodingManager;
@@ -68,6 +69,15 @@ public class FlightShimPluginManager
 {
     private static final Logger log = Logger.get(FlightShimPluginManager.class);
     private static final String SERVICES_FILE = "META-INF/services/" + Plugin.class.getName();
+
+    // Plugins hand Arrow buffers and vectors to the shim through ConnectorArrowSource, so the shim
+    // shares Arrow and the adapter holder classes with its plugins. This is scoped to the shim: the
+    // Presto server does not provide Arrow, and plugins there must keep their own copies.
+    static final List<String> FLIGHT_SHIM_SPI_PACKAGES = ImmutableList.<String>builder()
+            .addAll(SPI_PACKAGES)
+            .add(ConnectorArrowSourceAdapter.class.getName())
+            .add("org.apache.arrow.")
+            .build();
     private final ConnectorManager connectorManager;
     private final CatalogManager catalogManager;
     private final Map<String, ConnectorCodecs> connectorCodecMap = new ConcurrentHashMap<>();
@@ -228,7 +238,7 @@ public class FlightShimPluginManager
                     installedPluginsDir,
                     plugins,
                     resolver,
-                    SPI_PACKAGES,
+                    FLIGHT_SHIM_SPI_PACKAGES,
                     null,
                     SERVICES_FILE,
                     getClass().getClassLoader());
