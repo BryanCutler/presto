@@ -77,8 +77,34 @@ public class JdbcArrowSource
         requireNonNull(columnHandleList, "columnHandleList is null");
         List<Field> fields = columnHandleList.stream().map(columnHandle -> prestoToArrowField(columnHandle.getColumnMetadata())).collect(Collectors.toList());
         Schema schema = new Schema(fields);
+        this.recordBatchSize = recordBatchSize;
 
+        // Vectors and consumers are built before the query runs, so a column type without a consumer
+        // fails with the original exception (callers fall back on UnsupportedOperationException) and
+        // leaves no connection or statement open.
+        this.root = VectorSchemaRoot.create(schema, allocator);
         try {
+            JdbcToArrowConfig config =
+                    new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
+                            .build();
+
+            int columnCount = columnHandleList.size();
+            JdbcConsumer<?>[] consumers = new JdbcConsumer[columnCount];
+            for (int i = 0; i < columnCount; i++) {
+                FieldVector vector = root.getVector(i);
+                consumers[i] =
+                        createConsumer(
+                                vector,
+                                i + 1, // ResultSetMetaData columns have indices starting at 1
+                                columnHandleList.get(i).isNullable(),
+                                config);
+            }
+
+            compositeConsumer = new CompositeJdbcConsumer(consumers);
+
+            // Ensure vectors have required capacity for the batch size
+            ValueVectorUtility.ensureCapacity(root, recordBatchSize);
+
             connection = jdbcClient.getConnection(session, JdbcIdentity.from(session), split);
             statement = jdbcClient.buildSql(session, connection, split, columnHandleList);
             log.debug("Executing: %s", statement.toString());
@@ -87,29 +113,6 @@ public class JdbcArrowSource
         catch (SQLException | RuntimeException e) {
             throw handleSqlException(e);
         }
-
-        this.root = VectorSchemaRoot.create(schema, allocator);
-        this.recordBatchSize = recordBatchSize;
-
-        JdbcToArrowConfig config =
-                new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
-                        .build();
-
-        int columnCount = columnHandleList.size();
-        JdbcConsumer<?>[] consumers = new JdbcConsumer[columnCount];
-        for (int i = 0; i < columnCount; i++) {
-            FieldVector vector = root.getVector(i);
-            consumers[i] =
-                    createConsumer(
-                            vector,
-                            i + 1, // ResultSetMetaData columns have indices starting at 1
-                            columnHandleList.get(i).isNullable(),
-                            config);
-        }
-
-        compositeConsumer = new CompositeJdbcConsumer(consumers);
-
-        ValueVectorUtility.ensureCapacity(root, recordBatchSize);
     }
 
     @Override
@@ -174,7 +177,10 @@ public class JdbcArrowSource
         try (Connection connection = this.connection;
                 Statement statement = this.statement;
                 ResultSet resultSet = this.resultSet) {
-            jdbcClient.abortReadConnection(connection);
+            // The connection is null when opening it failed
+            if (connection != null) {
+                jdbcClient.abortReadConnection(connection);
+            }
         }
         catch (SQLException e) {
             // ignore exception from close
