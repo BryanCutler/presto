@@ -21,12 +21,17 @@ import com.facebook.presto.spi.connector.ConnectorArrowSource;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
 import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
+import org.apache.arrow.adapter.jdbc.consumer.ArrayConsumer;
+import org.apache.arrow.adapter.jdbc.consumer.BaseConsumer;
 import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
 import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
 import org.apache.arrow.vector.AllocationHelper;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.TimeStampMilliVector;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.ValueVectorUtility;
@@ -37,6 +42,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.Calendar;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -93,11 +100,10 @@ public class JdbcArrowSource
         for (int i = 0; i < columnCount; i++) {
             FieldVector vector = root.getVector(i);
             consumers[i] =
-                    getConsumer(
-                            vector.getField().getType(),
+                    createConsumer(
+                            vector,
                             i + 1, // ResultSetMetaData columns have indices starting at 1
                             columnHandleList.get(i).isNullable(),
-                            vector,
                             config);
         }
 
@@ -179,6 +185,52 @@ public class JdbcArrowSource
         }
         if (compositeConsumer != null) {
             compositeConsumer.close();
+        }
+    }
+
+    private static JdbcConsumer<?> createConsumer(FieldVector vector, int columnIndex, boolean nullable, JdbcToArrowConfig config)
+    {
+        // With a calendar configured, arrow-jdbc always builds a TimestampTZConsumer, which requires a
+        // TimeStampMilliTZVector. Presto timestamps use time zone naive TimeStampMilliVectors, so
+        // timestamp consumers, including those nested in arrays, are built here.
+        if (vector instanceof TimeStampMilliVector) {
+            return new TimestampMilliConsumer((TimeStampMilliVector) vector, columnIndex, config.getCalendar());
+        }
+        if (vector instanceof ListVector && !(vector instanceof MapVector)) {
+            ListVector listVector = (ListVector) vector;
+            FieldVector dataVector = listVector.getDataVector();
+            // Elements are read from column 2 of the java.sql.Array result set, as in arrow-jdbc
+            JdbcConsumer<?> elementConsumer = createConsumer(dataVector, 2, dataVector.getField().isNullable(), config);
+            return ArrayConsumer.createConsumer(listVector, elementConsumer, columnIndex, nullable);
+        }
+        return getConsumer(vector.getField().getType(), columnIndex, nullable, vector, config);
+    }
+
+    /**
+     * Reads a timestamp with the configured calendar into a TimeStampMilliVector, matching
+     * arrow-jdbc's TimestampTZConsumer apart from the vector type.
+     */
+    private static final class TimestampMilliConsumer
+            extends BaseConsumer<TimeStampMilliVector>
+    {
+        private final Calendar calendar;
+
+        private TimestampMilliConsumer(TimeStampMilliVector vector, int columnIndex, Calendar calendar)
+        {
+            super(vector, columnIndex);
+            this.calendar = requireNonNull(calendar, "calendar is null");
+        }
+
+        @Override
+        public void consume(ResultSet resultSet)
+                throws SQLException
+        {
+            Timestamp timestamp = resultSet.getTimestamp(columnIndexInResultSet, calendar);
+            // Rows left unset stay null in the vector
+            if (!resultSet.wasNull()) {
+                vector.set(currentIndex, timestamp.getTime());
+            }
+            currentIndex++;
         }
     }
 
