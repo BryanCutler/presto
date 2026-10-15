@@ -168,13 +168,19 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- for testing -->
+
         <dependency>
             <groupId>org.apache.arrow</groupId>
-            <artifactId>arrow-jdbc</artifactId>
-            <version>${dep.arrow.version}</version>
+            <artifactId>arrow-memory-netty</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-
-        <!-- for testing -->
 
         <dependency>
             <groupId>org.assertj</groupId>

@@ -14,50 +14,40 @@
 package com.facebook.presto.plugin.jdbc;
 
 import com.facebook.airlift.log.Logger;
+import com.facebook.plugin.arrow.ArrowVectorWriter;
+import com.facebook.plugin.arrow.ArrowWriterFactory;
 import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
+import com.facebook.presto.plugin.jdbc.mapping.ReadMapping;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorArrowSource;
-import org.apache.arrow.adapter.jdbc.JdbcToArrowConfig;
-import org.apache.arrow.adapter.jdbc.JdbcToArrowConfigBuilder;
-import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils;
-import org.apache.arrow.adapter.jdbc.consumer.ArrayConsumer;
-import org.apache.arrow.adapter.jdbc.consumer.BaseConsumer;
-import org.apache.arrow.adapter.jdbc.consumer.CompositeJdbcConsumer;
-import org.apache.arrow.adapter.jdbc.consumer.JdbcConsumer;
+import com.google.common.base.VerifyException;
+import com.google.common.collect.ImmutableList;
 import org.apache.arrow.vector.AllocationHelper;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.TimeStampMilliVector;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.complex.ListVector;
-import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.ValueVectorUtility;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.util.Calendar;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.facebook.plugin.arrow.BlockArrowWriter.prestoToArrowField;
+import static com.facebook.plugin.arrow.ArrowWriterFactory.prestoToArrowField;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static java.util.Objects.requireNonNull;
-import static org.apache.arrow.adapter.jdbc.JdbcToArrowUtils.getConsumer;
 
 public class JdbcArrowSource
         extends ConnectorArrowSourceAdapter
 {
     private static final Logger log = Logger.get(JdbcArrowSource.class);
 
-    private final CompositeJdbcConsumer compositeConsumer;
+    private final List<ArrowVectorWriter<ResultSet>> writers;
     private final int recordBatchSize;
     private final VectorSchemaRoot root;
 
@@ -79,28 +69,19 @@ public class JdbcArrowSource
         Schema schema = new Schema(fields);
         this.recordBatchSize = recordBatchSize;
 
-        // Vectors and consumers are built before the query runs, so a column type without a consumer
-        // fails with the original exception (callers fall back on UnsupportedOperationException) and
-        // leaves no connection or statement open.
+        // Vectors and writers are built before the query runs, so an unsupported column type fails
+        // without leaving a connection or statement open.
         this.root = VectorSchemaRoot.create(schema, allocator);
         try {
-            JdbcToArrowConfig config =
-                    new JdbcToArrowConfigBuilder(allocator, JdbcToArrowUtils.getUtcCalendar()).setTargetBatchSize(recordBatchSize).setReuseVectorSchemaRoot(true)
-                            .build();
-
-            int columnCount = columnHandleList.size();
-            JdbcConsumer<?>[] consumers = new JdbcConsumer[columnCount];
-            for (int i = 0; i < columnCount; i++) {
-                FieldVector vector = root.getVector(i);
-                consumers[i] =
-                        createConsumer(
-                                vector,
-                                i + 1, // ResultSetMetaData columns have indices starting at 1
-                                columnHandleList.get(i).isNullable(),
-                                config);
+            // Values are read with the connector's read mappings, as JdbcRecordCursor does
+            ImmutableList.Builder<ArrowVectorWriter<ResultSet>> writerBuilder = ImmutableList.builder();
+            for (int i = 0; i < columnHandleList.size(); i++) {
+                ReadMapping readMapping = jdbcClient.toPrestoType(session, columnHandleList.get(i).getJdbcTypeHandle())
+                        .orElseThrow(() -> new VerifyException("Unsupported column type"));
+                JdbcArrowWriterBuilder builder = new JdbcArrowWriterBuilder(root.getVector(i), readMapping.getType(), readMapping);
+                writerBuilder.add(ArrowWriterFactory.createArrowWriter(builder));
             }
-
-            compositeConsumer = new CompositeJdbcConsumer(consumers);
+            writers = writerBuilder.build();
 
             // Ensure vectors have required capacity for the batch size
             ValueVectorUtility.ensureCapacity(root, recordBatchSize);
@@ -129,7 +110,6 @@ public class JdbcArrowSource
         }
 
         root.clear();
-        compositeConsumer.resetVectorSchemaRoot(root);
 
         // Ensure capacity
         for (ValueVector vector : root.getFieldVectors()) {
@@ -142,7 +122,10 @@ public class JdbcArrowSource
 
             while ((readRowCount < recordBatchSize) && !finished) {
                 if (resultSet.next()) {
-                    compositeConsumer.consume(resultSet);
+                    for (int column = 0; column < writers.size(); column++) {
+                        // ResultSet columns have indices starting at 1
+                        writers.get(column).write(readRowCount, resultSet, column + 1);
+                    }
                     readRowCount++;
                 }
                 else {
@@ -153,7 +136,7 @@ public class JdbcArrowSource
             root.setRowCount(readRowCount);
             return readRowCount > 0;
         }
-        catch (SQLException | IOException | RuntimeException e) {
+        catch (SQLException | RuntimeException e) {
             throw handleSqlException(e);
         }
     }
@@ -188,55 +171,6 @@ public class JdbcArrowSource
 
         if (root != null) {
             root.close();
-        }
-        if (compositeConsumer != null) {
-            compositeConsumer.close();
-        }
-    }
-
-    private static JdbcConsumer<?> createConsumer(FieldVector vector, int columnIndex, boolean nullable, JdbcToArrowConfig config)
-    {
-        // With a calendar configured, arrow-jdbc always builds a TimestampTZConsumer, which requires a
-        // TimeStampMilliTZVector. Presto timestamps use time zone naive TimeStampMilliVectors, so
-        // timestamp consumers, including those nested in arrays, are built here.
-        if (vector instanceof TimeStampMilliVector) {
-            return new TimestampMilliConsumer((TimeStampMilliVector) vector, columnIndex, config.getCalendar());
-        }
-        if (vector instanceof ListVector && !(vector instanceof MapVector)) {
-            ListVector listVector = (ListVector) vector;
-            FieldVector dataVector = listVector.getDataVector();
-            // Elements are read from column 2 of the java.sql.Array result set, as in arrow-jdbc
-            JdbcConsumer<?> elementConsumer = createConsumer(dataVector, 2, dataVector.getField().isNullable(), config);
-            return ArrayConsumer.createConsumer(listVector, elementConsumer, columnIndex, nullable);
-        }
-        return getConsumer(vector.getField().getType(), columnIndex, nullable, vector, config);
-    }
-
-    /**
-     * Reads a timestamp with the configured calendar into a TimeStampMilliVector, matching
-     * arrow-jdbc's TimestampTZConsumer apart from the vector type.
-     */
-    private static final class TimestampMilliConsumer
-            extends BaseConsumer<TimeStampMilliVector>
-    {
-        private final Calendar calendar;
-
-        private TimestampMilliConsumer(TimeStampMilliVector vector, int columnIndex, Calendar calendar)
-        {
-            super(vector, columnIndex);
-            this.calendar = requireNonNull(calendar, "calendar is null");
-        }
-
-        @Override
-        public void consume(ResultSet resultSet)
-                throws SQLException
-        {
-            Timestamp timestamp = resultSet.getTimestamp(columnIndexInResultSet, calendar);
-            // Rows left unset stay null in the vector
-            if (!resultSet.wasNull()) {
-                vector.set(currentIndex, timestamp.getTime());
-            }
-            currentIndex++;
         }
     }
 
