@@ -26,6 +26,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.DateDayVector;
+import org.apache.arrow.vector.DecimalVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.Float8Vector;
@@ -51,6 +52,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -296,6 +298,81 @@ public class TestArrowBatchSource
 
             try (VectorSchemaRoot expectedRoot = new VectorSchemaRoot(Arrays.asList(intVector, listVectorInt, listVectorVarchar))) {
                 expectedRoot.setRowCount(numValues);
+
+                TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
+
+                try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+                    assertTrue(arrowBatchSource.nextBatch());
+                    assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
+                    assertFalse(arrowBatchSource.nextBatch());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testDecimalTypes()
+            throws IOException
+    {
+        // Short decimals (precision <= 18) are long-encoded in Presto, long decimals are Slice-encoded
+        List<String> shortValues = Arrays.asList("0.00", "12345678.91", "-12345678.91", "99999999.99", "-99999999.99", "-0.01", null);
+        List<String> longValues = Arrays.asList("0.00000", "1234567890123456789012345.67891", "-1234567890123456789012345.67891",
+                "9999999999999999999999999.99999", "-9999999999999999999999999.99999", "-0.00001", null);
+        try (DecimalVector shortVector = new DecimalVector("short-decimal", allocator, 10, 2);
+                DecimalVector longVector = new DecimalVector("long-decimal", allocator, 30, 5)) {
+            shortVector.allocateNew(shortValues.size());
+            longVector.allocateNew(longValues.size());
+            for (int i = 0; i < shortValues.size(); i++) {
+                if (shortValues.get(i) == null) {
+                    shortVector.setNull(i);
+                    longVector.setNull(i);
+                }
+                else {
+                    shortVector.set(i, new BigDecimal(shortValues.get(i)));
+                    longVector.set(i, new BigDecimal(longValues.get(i)));
+                }
+            }
+
+            try (VectorSchemaRoot expectedRoot = new VectorSchemaRoot(Arrays.asList(shortVector, longVector))) {
+                expectedRoot.setRowCount(shortValues.size());
+
+                TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
+
+                try (ArrowBatchSource arrowBatchSource = new ArrowBatchSource(allocator, pageSource.getColumns(), pageSource, MAX_ROWS_PER_BATCH)) {
+                    assertTrue(arrowBatchSource.nextBatch());
+                    assertTrue(expectedRoot.equals(arrowBatchSource.getVectorSchemaRoot()));
+                    assertFalse(arrowBatchSource.nextBatch());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testArrayWithNullElements()
+            throws IOException
+    {
+        try (ListVector listVector = ListVector.empty("array-int-nulls", allocator)) {
+            listVector.addOrGetVector(FieldType.nullable(Types.MinorType.INT.getType()));
+            listVector.allocateNew();
+
+            // [0, null, 2], [null], []
+            final UnionListWriter writer = listVector.getWriter();
+            writer.setPosition(0);
+            writer.startList();
+            writer.integer().writeInt(0);
+            writer.integer().writeNull();
+            writer.integer().writeInt(2);
+            writer.endList();
+            writer.setPosition(1);
+            writer.startList();
+            writer.integer().writeNull();
+            writer.endList();
+            writer.setPosition(2);
+            writer.startList();
+            writer.endList();
+
+            try (VectorSchemaRoot expectedRoot = new VectorSchemaRoot(Arrays.asList(listVector))) {
+                expectedRoot.setRowCount(3);
 
                 TestArrowPageSource pageSource = TestArrowPageSource.create(arrowBlockBuilder, expectedRoot, 1);
 

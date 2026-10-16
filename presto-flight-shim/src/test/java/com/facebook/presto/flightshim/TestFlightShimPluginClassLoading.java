@@ -15,7 +15,7 @@ package com.facebook.presto.flightshim;
 
 import com.facebook.airlift.resolver.ArtifactResolver;
 import com.facebook.plugin.arrow.ArrowPlugin;
-import com.facebook.plugin.arrow.BlockArrowWriter;
+import com.facebook.plugin.arrow.BlockArrowWriterBuilder;
 import com.facebook.plugin.arrow.ConnectorArrowSourceAdapter;
 import com.facebook.presto.server.PluginManagerUtil;
 import com.facebook.presto.server.PluginManagerUtil.PluginClassLoaderHandle;
@@ -56,7 +56,7 @@ public class TestFlightShimPluginClassLoading
         // One plugin directory holding the Arrow Flight connector, presto-common-arrow and arrow-vector
         pluginsDir = Files.createTempDirectory("flight-shim-plugins");
         Path pluginDir = Files.createDirectory(pluginsDir.resolve("arrow"));
-        List<Class<?>> markers = ImmutableList.of(ArrowPlugin.class, BlockArrowWriter.class, VectorSchemaRoot.class);
+        List<Class<?>> markers = ImmutableList.of(ArrowPlugin.class, BlockArrowWriterBuilder.class, VectorSchemaRoot.class);
         for (int i = 0; i < markers.size(); i++) {
             Files.createSymbolicLink(pluginDir.resolve("entry-" + i), codeSourceOf(markers.get(i)));
         }
@@ -76,7 +76,7 @@ public class TestFlightShimPluginClassLoading
         try (URLClassLoader pluginClassLoader = buildPluginClassLoader(FLIGHT_SHIM_SPI_PACKAGES)) {
             // Other classes in com.facebook.plugin.arrow belong to the plugin
             assertSame(pluginClassLoader.loadClass(ArrowPlugin.class.getName()).getClassLoader(), pluginClassLoader);
-            assertSame(pluginClassLoader.loadClass(BlockArrowWriter.class.getName()).getClassLoader(), pluginClassLoader);
+            assertSame(pluginClassLoader.loadClass(BlockArrowWriterBuilder.class.getName()).getClassLoader(), pluginClassLoader);
 
             // Classes that cross the ConnectorArrowSource boundary resolve to the shim's copies
             assertSame(pluginClassLoader.loadClass(ConnectorArrowSourceAdapter.class.getName()), ConnectorArrowSourceAdapter.class);

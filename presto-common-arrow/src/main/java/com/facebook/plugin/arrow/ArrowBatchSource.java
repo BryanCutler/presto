@@ -22,18 +22,21 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.AllocationHelper;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
 import java.util.List;
 
-import static com.facebook.plugin.arrow.BlockArrowWriter.createArrowWriters;
+import static com.facebook.plugin.arrow.ArrowWriterFactory.createArrowWriter;
+import static com.facebook.plugin.arrow.ArrowWriterFactory.prestoToArrowField;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class ArrowBatchSource
         implements AutoCloseable
 {
     private final VectorSchemaRoot root;
-    private final List<BlockArrowWriter.ArrowVectorWriter> writers;
+    private final List<ArrowVectorWriter<Block>> writers;
     private final int maxRowsPerBatch;
     private final ConnectorPageSource pageSource;
 
@@ -44,8 +47,11 @@ public class ArrowBatchSource
     {
         this.pageSource = requireNonNull(pageSource, "pageSource is null");
         this.maxRowsPerBatch = maxRowsPerBatch;
-        ImmutableList.Builder<BlockArrowWriter.ArrowVectorWriter> writerBuilder = ImmutableList.builder();
-        this.root = createArrowWriters(allocator, columns, writerBuilder);
+        this.root = VectorSchemaRoot.create(new Schema(columns.stream().map(column -> prestoToArrowField(column)).collect(toImmutableList())), allocator);
+        ImmutableList.Builder<ArrowVectorWriter<Block>> writerBuilder = ImmutableList.builder();
+        for (int i = 0; i < columns.size(); i++) {
+            writerBuilder.add(createArrowWriter(new BlockArrowWriterBuilder(root.getVector(i), columns.get(i).getType())));
+        }
         this.writers = writerBuilder.build();
     }
 
@@ -82,15 +88,7 @@ public class ArrowBatchSource
             }
 
             for (int column = 0; column < writers.size(); column++) {
-                Block block = currentPage.getBlock(column);
-                BlockArrowWriter.ArrowVectorWriter writer = writers.get(column);
-
-                if (block.isNull(currentPosition)) {
-                    writer.writeNull(batchRowIndex);
-                }
-                else {
-                    writer.writeBlock(batchRowIndex, block, currentPosition);
-                }
+                writers.get(column).write(batchRowIndex, currentPage.getBlock(column), currentPosition);
             }
             currentPosition++;
             batchRowIndex++;
